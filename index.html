@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LocalMovieSync (LMS) - Local Movie Browser, VLC Player & Watch Party</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Pure-JS Matroska (.mkv) subtitle demuxer - lets us pull embedded SRT/ASS subtitle
+         tracks out of MKV files entirely client-side, no ffmpeg/server needed.
+         If this fails to load (e.g. no internet on first run), embedded-subtitle
+         extraction is simply skipped - external .srt/.vtt upload still works. -->
+    <script src="https://cdn.jsdelivr.net/npm/matroska-subtitles@3.x/dist/matroska-subtitles.min.js" defer onerror="window.__mkvSubsLoadFailed = true"></script>
+    <!-- Watch Party: PeerJS gives us WebRTC peer-to-peer connections in the
+         browser. Its free public "broker" server only ever introduces two
+         browsers to each other (signaling) - the actual chat/sync data flows
+         directly between browsers, never through any server, and no video is
+         ever uploaded anywhere. Requires internet on first load. -->
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js" defer onerror="window.__peerJsLoadFailed = true"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        netflixRed: '#E50914',
+                        netflixDark: '#141414',
+                        netflixCard: '#1f1f1f',
+                        netflixHover: '#2a2a2a',
+                        vlcOrange: '#FF6600'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #141414;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #141414;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        /* Fix: dropdown options (including JS-added subtitle/embedded-track options)
+           were inheriting no background, so on OS/browser combos that render native
+           <option> lists with a light theme, white text sat on a white background. */
+        select option {
+            background-color: #1f1f1f;
+            color: #ffffff;
+        }
+        /* Fix: range inputs had appearance-none with no replacement thumb/track
+           styling, so the "filled" portion of the progress/volume bar never
+           rendered. We style track+thumb ourselves and fill it via a JS-driven
+           background gradient (see updateRangeFill()). */
+        input[type="range"].av-range {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 999px;
+            background: linear-gradient(to right, #E50914 0%, #E50914 0%, #4b5563 0%, #4b5563 100%);
+            outline: none;
+            cursor: pointer;
+        }
+        input[type="range"].av-range::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #ffffff;
+            box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.9);
+            cursor: pointer;
+            margin-top: 0;
+        }
+        input[type="range"].av-range::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border: none;
+            border-radius: 50%;
+            background: #ffffff;
+            box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.9);
+            cursor: pointer;
+        }
+        input[type="range"].av-range::-moz-range-track {
+            height: 6px;
+            border-radius: 999px;
+            background: transparent;
+        }
+        input[type="range"].av-range::-moz-range-progress {
+            height: 6px;
+            border-radius: 999px;
+            background: #E50914;
+        }
+        /* Auto-hide overlay controls during playback so they stop covering the
+           video/subtitles - see showControls()/scheduleAutoHide() in JS. */
+        #playerTopBar, #playerControls {
+            transition: opacity 0.35s ease, transform 0.35s ease;
+        }
+        #playerTopBar.controls-hidden {
+            opacity: 0 !important;
+            transform: translateY(-12px);
+            pointer-events: none;
+        }
+        #playerControls.controls-hidden {
+            opacity: 0 !important;
+            transform: translateY(12px);
+            pointer-events: none;
+        }
+        #videoContainer.cursor-hidden {
+            cursor: none;
+        }
+        /* Hide native video controls */
+        video::-webkit-media-controls {
+            display: none !important;
+        }
+        .glow-hover:hover {
+            box-shadow: 0 10px 30px -5px rgba(229, 9, 20, 0.4);
+        }
+        /* Fade transitions */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.98); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        /* Floating reactions: pure CSS rise-and-fade, nothing persisted anywhere. */
+        .floating-reaction {
+            position: absolute;
+            bottom: 0;
+            font-size: 2rem;
+            opacity: 0;
+            animation: floatUp 2.6s ease-in forwards;
+            will-change: transform, opacity;
+        }
+        @keyframes floatUp {
+            0%   { opacity: 0; transform: translateY(0) scale(0.6) rotate(0deg); }
+            10%  { opacity: 1; transform: translateY(-8vh) scale(1.1) rotate(-6deg); }
+            80%  { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-70vh) scale(1) rotate(8deg); }
+        }
+        .reaction-btn { transition: transform 0.15s ease; }
+        .reaction-btn:active { transform: scale(1.3); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-netflixDark text-white selection:bg-netflixRed selection:text-white">
+
+    <header class="sticky top-0 z-40 bg-netflixDark/95 backdrop-blur-md border-b border-zinc-800 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center justify-between w-full md:w-auto">
+            <h1 class="text-3xl font-black tracking-tighter text-netflixRed uppercase cursor-pointer flex items-center gap-2">
+                <i class="fa-solid fa-clapperboard"></i> LocalMovieSync <span class="text-zinc-500 text-lg font-bold normal-case tracking-normal ml-1">(LMS)</span>
+            </h1>
+            <span id="loadBadge" class="hidden text-xs bg-zinc-800 text-zinc-300 px-2.5 py-1 rounded-full font-medium ml-3">0 movies</span>
+            <span id="partyStatusBadge" class="hidden text-xs bg-netflixRed/20 text-netflixRed border border-netflixRed/40 px-2.5 py-1 rounded-full font-medium ml-2 items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-netflixRed animate-pulse"></span><span id="partyStatusText"></span>
+            </span>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+            <label class="cursor-pointer bg-netflixRed hover:bg-red-700 text-white px-4 py-2 rounded-md font-semibold text-sm transition shadow-lg flex items-center gap-2">
+                <i class="fa-solid fa-folder-open"></i> Load Movie Folder
+                <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden">
+            </label>
+            <label class="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-4 py-2 rounded-md font-semibold text-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-file-arrow-up"></i> Add Files
+                <input type="file" id="filesInput" multiple accept="video/*" class="hidden">
+            </label>
+            <button onclick="openPartyModal()" id="partyBtn" title="Watch Party" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-4 py-2 rounded-md font-semibold text-sm transition flex items-center gap-2">
+                <i class="fa-solid fa-users"></i> Watch Party
+            </button>
+            <button onclick="clearHistory()" title="Clear Watch History" class="bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white p-2 rounded-md border border-zinc-800 transition">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+        </div>
+    </header>
+
+    <section id="heroBanner" class="relative px-6 py-12 md:py-20 bg-gradient-to-b from-zinc-900 to-netflixDark border-b border-zinc-800/60">
+        <div class="max-w-4xl mx-auto text-center space-y-4">
+            <h2 class="text-3xl md:text-5xl font-bold tracking-tight">Your Personal Cinematic Universe</h2>
+            <p class="text-zinc-400 text-sm md:text-base max-w-xl mx-auto">
+                Select your local movie folder or drag & drop video files. Enjoy automatic canvas video thumbnails, intelligent filtering, embedded subtitle extraction, and VLC-grade playback.
+            </p>
+            <div class="pt-2 flex flex-wrap justify-center gap-6 text-xs text-zinc-500">
+                <span><i class="fa-solid fa-shield-halved text-green-500"></i> 100% Client-Side & Private</span>
+                <span><i class="fa-solid fa-bolt text-amber-500"></i> Canvas Thumbnail Generator</span>
+                <span><i class="fa-solid fa-closed-captioning text-netflixRed"></i> Auto-Subtitle Extraction</span>
+            </div>
+        </div>
+    </section>
+
+    <nav class="sticky top-[73px] z-30 bg-netflixDark/90 backdrop-blur-md px-6 py-3 border-b border-zinc-800 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-2 flex-1 min-w-[240px] max-w-md bg-zinc-900/80 border border-zinc-700 rounded-md px-3 py-1.5 focus-within:border-netflixRed transition">
+            <i class="fa-solid fa-magnifying-glass text-zinc-400 text-sm"></i>
+            <input type="text" id="searchInput" placeholder="Search movies by title..." class="bg-transparent border-none outline-none text-sm w-full text-white placeholder-zinc-500">
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 text-sm">
+            <div class="flex items-center space-x-1.5 bg-zinc-900 border border-zinc-700 rounded-md px-3 py-1.5">
+                <span class="text-zinc-400 text-xs uppercase font-semibold">Format:</span>
+                <select id="formatFilter" class="bg-transparent border-none outline-none text-white cursor-pointer text-sm">
+                    <option value="all" class="bg-zinc-900">All Formats</option>
+                    <option value="mp4" class="bg-zinc-900">MP4</option>
+                    <option value="mkv" class="bg-zinc-900">MKV</option>
+                    <option value="webm" class="bg-zinc-900">WebM</option>
+                    <option value="mov" class="bg-zinc-900">MOV</option>
+                    <option value="avi" class="bg-zinc-900">AVI</option>
+                </select>
+            </div>
+
+            <div class="flex items-center space-x-1.5 bg-zinc-900 border border-zinc-700 rounded-md px-3 py-1.5">
+                <span class="text-zinc-400 text-xs uppercase font-semibold">Sort By:</span>
+                <select id="sortBy" class="bg-transparent border-none outline-none text-white cursor-pointer text-sm">
+                    <option value="name-asc" class="bg-zinc-900">Name (A - Z)</option>
+                    <option value="name-desc" class="bg-zinc-900">Name (Z - A)</option>
+                    <option value="duration-desc" class="bg-zinc-900">Duration (Longest first)</option>
+                    <option value="duration-asc" class="bg-zinc-900">Duration (Shortest first)</option>
+                    <option value="size-desc" class="bg-zinc-900">Size (Largest first)</option>
+                    <option value="size-asc" class="bg-zinc-900">Size (Smallest first)</option>
+                    <option value="date-desc" class="bg-zinc-900">Date Added (Newest)</option>
+                </select>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-1 px-6 py-8">
+        <div id="movieGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+            <div class="col-span-full py-24 text-center text-zinc-500">
+                <i class="fa-solid fa-film text-6xl mb-4 text-zinc-700"></i>
+                <p class="text-lg">No movies loaded yet. Click <strong>"Load Movie Folder"</strong> above to begin your cinematic session.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Watch Party: create/join modal -->
+    <div id="partyModal" class="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-netflixCard border border-zinc-700 rounded-lg w-full max-w-md p-6 space-y-5">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-users text-netflixRed"></i> Watch Party</h3>
+                <button onclick="closePartyModal()" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div id="partyIdle" class="space-y-4">
+                <p class="text-sm text-zinc-400">Host a watch party from this tab, or join one someone shared with you. Everyone needs their own copy of the movie file loaded — this only syncs play/pause/seek, chat, and reactions, peer-to-peer. Nothing video-related is ever uploaded.</p>
+                <input id="partyNameInput" type="text" maxlength="20" placeholder="Your display name" class="w-full bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-sm outline-none focus:border-netflixRed">
+                <button onclick="createParty()" class="w-full bg-netflixRed hover:bg-red-700 py-2.5 rounded-md font-semibold text-sm transition">
+                    <i class="fa-solid fa-plus"></i> Start a Watch Party
+                </button>
+                <div class="flex items-center gap-2 text-xs text-zinc-600"><div class="flex-1 h-px bg-zinc-800"></div>or<div class="flex-1 h-px bg-zinc-800"></div></div>
+                <div class="flex gap-2">
+                    <input id="joinCodeInput" type="text" maxlength="8" placeholder="Enter party code" class="flex-1 bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-sm outline-none focus:border-netflixRed uppercase">
+                    <button onclick="joinParty()" class="bg-zinc-800 hover:bg-zinc-700 px-4 rounded-md font-semibold text-sm transition">Join</button>
+                </div>
+            </div>
+
+            <div id="partyConnecting" class="hidden text-center py-6 text-zinc-400 text-sm">
+                <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-3 text-netflixRed"></i>
+                <p id="partyConnectingText">Connecting…</p>
+            </div>
+
+            <div id="partyActive" class="hidden space-y-4">
+                <div class="bg-zinc-900 border border-zinc-700 rounded-md p-3 flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs text-zinc-500 uppercase font-semibold">Party Code</p>
+                        <p id="partyCodeDisplay" class="text-lg font-mono font-bold tracking-widest"></p>
+                    </div>
+                    <button onclick="copyPartyLink()" class="bg-netflixRed hover:bg-red-700 px-3 py-2 rounded-md text-xs font-semibold transition whitespace-nowrap"><i class="fa-solid fa-link"></i> Copy Link</button>
+                </div>
+                <p id="partyRoleNote" class="text-xs text-zinc-400"></p>
+                <p class="text-sm"><span class="text-zinc-400">Connected:</span> <span id="partyMemberCount" class="font-semibold">1</span></p>
+                <button onclick="leaveParty()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-red-400 py-2 rounded-md font-semibold text-sm transition">
+                    <i class="fa-solid fa-right-from-bracket"></i> <span id="leavePartyLabel">End Watch Party</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Watch Party: floating chat toggle + panel (visible once connected) -->
+    <div id="partyChatToggle" class="hidden fixed bottom-6 left-6 z-40">
+        <button onclick="togglePartyChat()" class="relative bg-netflixRed hover:bg-red-700 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-xl transition">
+            <i class="fa-solid fa-comments"></i>
+            <span id="partyChatBadge" class="hidden absolute -top-1 -right-1 bg-white text-netflixRed text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">0</span>
+        </button>
+    </div>
+
+    <div id="partyChatPanel" class="hidden fixed bottom-24 left-6 z-40 w-80 max-w-[90vw] bg-netflixCard border border-zinc-700 rounded-lg shadow-2xl flex-col overflow-hidden" style="height:420px;">
+        <div class="bg-zinc-900 px-4 py-3 flex items-center justify-between border-b border-zinc-800">
+            <span class="font-semibold text-sm flex items-center gap-2"><i class="fa-solid fa-users text-netflixRed"></i> Party Chat <span id="partyChatCount" class="text-zinc-500 font-normal"></span></span>
+            <button onclick="togglePartyChat()" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="partyChatMessages" class="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm"></div>
+        <div class="px-2 pt-1 pb-2 border-t border-zinc-800 flex items-center justify-between gap-1" id="reactionBar">
+            <!-- Quick reactions: sent as tiny P2P messages, not stored anywhere -->
+        </div>
+        <div class="p-2 pt-0 flex gap-2">
+            <input id="partyChatInput" type="text" placeholder="Message..." maxlength="300" class="flex-1 bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-sm outline-none focus:border-netflixRed">
+            <button onclick="sendPartyChat()" class="bg-netflixRed hover:bg-red-700 w-10 rounded-md flex items-center justify-center transition"><i class="fa-solid fa-paper-plane text-sm"></i></button>
+        </div>
+    </div>
+
+    <!-- Floating reactions rise up from here, over whatever's on screen -->
+    <div id="reactionLayer" class="fixed inset-0 z-[55] pointer-events-none overflow-hidden"></div>
+
+    <div id="playerModal" class="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl hidden flex-col justify-center items-center">
+        <!-- Top Title & Subtitle Toolbar -->
+        <div class="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-gradient-to-b from-black/90 to-transparent z-20 transition opacity-90 hover:opacity-100" id="playerTopBar">
+            <div class="flex items-center space-x-3">
+                <button onclick="closePlayer()" class="text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition">
+                    <i class="fa-solid fa-arrow-left text-lg"></i>
+                </button>
+                <h3 id="modalMovieTitle" class="text-base md:text-xl font-bold truncate max-w-xs md:max-w-xl">Movie Title</h3>
+            </div>
+            <div class="flex items-center space-x-2 md:space-x-3">
+                <!-- Audio Track Selector (shown only when a file has multiple audio tracks) -->
+                <div id="audioTrackWrap" class="hidden items-center space-x-2 bg-zinc-900/90 border border-zinc-700/80 px-3 py-1.5 rounded-md">
+                    <i class="fa-solid fa-headphones text-netflixRed"></i>
+                    <select id="audioTrackMenu" class="bg-transparent text-xs text-white border-none cursor-pointer outline-none"></select>
+                </div>
+                <!-- Subtitle Selector & External Loader -->
+                <div class="flex items-center space-x-2 bg-zinc-900/90 border border-zinc-700/80 px-3 py-1.5 rounded-md">
+                    <i class="fa-solid fa-closed-captioning text-netflixRed"></i>
+                    <select id="subtitlesMenu" class="bg-transparent text-xs text-white border-none cursor-pointer outline-none">
+                        <option value="off">Subtitles: Off</option>
+                    </select>
+                    <label class="cursor-pointer text-zinc-400 hover:text-white text-xs underline pl-1 border-l border-zinc-700" title="Upload External Subtitle (.srt / .vtt)">
+                        + Add
+                        <input type="file" id="subtitleInput" accept=".srt,.vtt" class="hidden">
+                    </label>
+                </div>
+                <button onclick="togglePartyChat()" id="playerPartyChatBtn" title="Party Chat" class="hidden text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition">
+                    <i class="fa-solid fa-comments text-lg"></i>
+                </button>
+                <button onclick="toggleFullscreen()" class="text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition" title="Toggle Fullscreen">
+                    <i id="fullscreenIcon" class="fa-solid fa-expand text-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Video Container -->
+        <div class="relative w-full h-full flex items-center justify-center cursor-pointer" id="videoContainer">
+            <video id="videoPlayer" class="max-w-full max-h-full object-contain" crossorigin="anonymous" playsinline>
+                Your browser does not support the video tag.
+            </video>
+            <!-- Center Play/Pause Indicator Animation -->
+            <div id="centerPlayIndicator" class="absolute pointer-events-none opacity-0 transition duration-300 text-white bg-black/60 p-6 rounded-full text-4xl shadow-2xl">
+                <i class="fa-solid fa-play" id="centerPlayIcon"></i>
+            </div>
+        </div>
+
+        <!-- VLC Custom Bottom Controls -->
+        <div class="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-black via-black/90 to-transparent flex flex-col gap-2.5 z-20 transition opacity-95 hover:opacity-100" id="playerControls">
+            <!-- Scrubbing Progress Bar -->
+            <div class="flex items-center gap-3">
+                <span id="currentTimeDisplay" class="text-xs text-zinc-400 font-mono w-12 text-right">00:00</span>
+                <input type="range" id="progressBar" value="0" min="0" max="100" step="0.1" class="av-range w-full h-2 rounded-lg cursor-pointer">
+                <span id="durationDisplay" class="text-xs text-zinc-400 font-mono w-12">00:00</span>
+            </div>
+
+            <div class="flex items-center justify-between pt-1">
+                <div class="flex items-center space-x-4 md:space-x-5">
+                    <button id="playPauseBtn" class="text-white hover:text-netflixRed transition text-xl" title="Play/Pause">
+                        <i class="fa-solid fa-play" id="playPauseIcon"></i>
+                    </button>
+                    <button onclick="skipTime(-10)" class="text-zinc-400 hover:text-white transition text-lg" title="Rewind 10s">
+                        <i class="fa-solid fa-rotate-left"></i>
+                    </button>
+                    <button onclick="skipTime(10)" class="text-zinc-400 hover:text-white transition text-lg" title="Forward 10s">
+                        <i class="fa-solid fa-rotate-right"></i>
+                    </button>
+                    <div class="flex items-center space-x-2">
+                        <button id="muteBtn" class="text-white hover:text-netflixRed transition text-lg" title="Mute/Unmute">
+                            <i class="fa-solid fa-volume-high" id="volumeIcon"></i>
+                        </button>
+                        <input type="range" id="volumeBar" min="0" max="1" step="0.05" value="1" class="av-range w-16 md:w-24 h-1 rounded-lg cursor-pointer">
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-3 text-xs md:text-sm">
+                    <div class="flex items-center space-x-1.5 bg-zinc-800/90 border border-zinc-700/80 rounded px-2.5 py-1">
+                        <span class="text-zinc-400">Speed:</span>
+                        <select id="playbackSpeed" class="bg-transparent text-white border-none cursor-pointer outline-none text-xs">
+                            <option value="0.5">0.5x</option>
+                            <option value="0.75">0.75x</option>
+                            <option value="1" selected>Normal</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x</option>
+                            <option value="2">2x</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let movies = [];
+        let currentMovieIndex = null;
+        let watchHistory = JSON.parse(localStorage.getItem('netflix_watch_history') || '{}');
+
+        const folderInput = document.getElementById('folderInput');
+        const filesInput = document.getElementById('filesInput');
+        const movieGrid = document.getElementById('movieGrid');
+        const searchInput = document.getElementById('searchInput');
+        const formatFilter = document.getElementById('formatFilter');
+        const sortBy = document.getElementById('sortBy');
+        const loadBadge = document.getElementById('loadBadge');
+        const heroBanner = document.getElementById('heroBanner');
+
+        // Player DOM
+        const playerModal = document.getElementById('playerModal');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const videoContainer = document.getElementById('videoContainer');
+        const modalMovieTitle = document.getElementById('modalMovieTitle');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const playPauseIcon = document.getElementById('playPauseIcon');
+        const progressBar = document.getElementById('progressBar');
+        const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+        const durationDisplay = document.getElementById('durationDisplay');
+        const muteBtn = document.getElementById('muteBtn');
+        const volumeIcon = document.getElementById('volumeIcon');
+        const volumeBar = document.getElementById('volumeBar');
+        const playbackSpeed = document.getElementById('playbackSpeed');
+        const subtitleInput = document.getElementById('subtitleInput');
+        const subtitlesMenu = document.getElementById('subtitlesMenu');
+        const fullscreenIcon = document.getElementById('fullscreenIcon');
+        const centerPlayIndicator = document.getElementById('centerPlayIndicator');
+        const centerPlayIcon = document.getElementById('centerPlayIcon');
+        const audioTrackWrap = document.getElementById('audioTrackWrap');
+        const audioTrackMenu = document.getElementById('audioTrackMenu');
+        const playerTopBar = document.getElementById('playerTopBar');
+        const playerControls = document.getElementById('playerControls');
+
+        let currentObjectURL = null;     // tracks the active blob: URL so we can revoke it (memory-leak fix)
+        let embeddedSubtitleTracks = {}; // mkv track number -> native TextTrack, for the current movie
+
+        // Drag & Drop handlers
+        window.addEventListener('dragover', (e) => e.preventDefault());
+        window.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleFileSelection(Array.from(e.dataTransfer.files));
+            }
+        });
+
+        folderInput.addEventListener('change', (e) => handleFileSelection(Array.from(e.target.files)));
+        filesInput.addEventListener('change', (e) => handleFileSelection(Array.from(e.target.files)));
+
+        function handleFileSelection(fileList) {
+            const videoFiles = fileList.filter(file => {
+                const ext = file.name.split('.').pop().toLowerCase();
+                return ['mp4', 'mkv', 'webm', 'mov', 'ogg', 'avi', 'm4v'].includes(ext);
+            });
+
+            if (videoFiles.length === 0) {
+                showNotification('No compatible video files found in selection.', 'error');
+                return;
+            }
+
+            movies = videoFiles.map((file, index) => {
+                const cleanName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+                const ext = file.name.split('.').pop().toLowerCase();
+                return {
+                    id: index,
+                    file: file,
+                    name: file.name,
+                    cleanName: cleanName,
+                    size: file.size,
+                    lastModified: file.lastModified || Date.now(),
+                    format: ext,
+                    duration: 0,
+                    thumbnailUrl: null,
+                    progress: watchHistory[file.name]?.progress || 0,
+                    currentTime: watchHistory[file.name]?.currentTime || 0
+                };
+            });
+
+            loadBadge.textContent = `${movies.length} movies loaded`;
+            loadBadge.classList.remove('hidden');
+            heroBanner.classList.add('hidden');
+
+            renderGrid();
+            generateThumbnailsAndDurations();
+        }
+
+        // Automatic Canvas Thumbnail and Duration Extractor
+        function generateThumbnailsAndDurations() {
+            movies.forEach((movie, idx) => {
+                const tempVideo = document.createElement('video');
+                tempVideo.src = URL.createObjectURL(movie.file);
+                tempVideo.preload = 'metadata';
+                tempVideo.muted = true;
+                tempVideo.playsInline = true;
+
+                tempVideo.onloadedmetadata = () => {
+                    movie.duration = tempVideo.duration;
+                    // Seek to 3 seconds or 15% in for a representative thumbnail frame
+                    tempVideo.currentTime = Math.min(3, tempVideo.duration / 4);
+                };
+
+                tempVideo.onseeked = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 320;
+                        canvas.height = 180;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
+                        movie.thumbnailUrl = canvas.toDataURL('image/jpeg', 0.75);
+                        
+                        // Update card UI for this specific movie if rendered
+                        const thumbImg = document.getElementById(`thumb-${idx}`);
+                        if (thumbImg) {
+                            thumbImg.style.backgroundImage = `url('${movie.thumbnailUrl}')`;
+                            thumbImg.style.backgroundSize = 'cover';
+                            thumbImg.style.backgroundPosition = 'center';
+                            thumbImg.innerHTML = ''; // Clear fallback icon
+                        }
+
+                        const durSpan = document.getElementById(`dur-${idx}`);
+                        if (durSpan && movie.duration) {
+                            durSpan.textContent = formatDuration(movie.duration);
+                        }
+                    } catch (e) {
+                        console.log('Thumbnail extraction skipped for CORS/codec restriction', e);
+                    }
+                    URL.revokeObjectURL(tempVideo.src);
+                };
+
+                tempVideo.onerror = () => {
+                    URL.revokeObjectURL(tempVideo.src);
+                };
+            });
+        }
+
+        function formatDuration(seconds) {
+            if (isNaN(seconds) || seconds === 0) return '';
+            const mins = Math.floor(seconds / 60);
+            const hrs = Math.floor(mins / 60);
+            const remMins = mins % 60;
+            if (hrs > 0) {
+                return `${hrs}h ${remMins}m`;
+            }
+            return `${mins}m`;
+        }
+
+        // Filtering and sorting triggers
+        searchInput.addEventListener('input', renderGrid);
+        formatFilter.addEventListener('change', renderGrid);
+        sortBy.addEventListener('change', renderGrid);
+
+        function getFilteredAndSortedMovies() {
+            const query = searchInput.value.toLowerCase().trim();
+            const format = formatFilter.value;
+            const sort = sortBy.value;
+
+            let result = movies.filter(movie => {
+                const matchesQuery = movie.cleanName.toLowerCase().includes(query) || movie.name.toLowerCase().includes(query);
+                const matchesFormat = format === 'all' || movie.format === format;
+                return matchesQuery && matchesFormat;
+            });
+
+            result.sort((a, b) => {
+                if (sort === 'name-asc') return a.cleanName.localeCompare(b.cleanName);
+                if (sort === 'name-desc') return b.cleanName.localeCompare(a.cleanName);
+                if (sort === 'duration-desc') return b.duration - a.duration;
+                if (sort === 'duration-asc') return a.duration - b.duration;
+                if (sort === 'size-desc') return b.size - a.size;
+                if (sort === 'size-asc') return a.size - b.size;
+                if (sort === 'date-desc') return b.lastModified - a.lastModified;
+                return 0;
+            });
+
+            return result;
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        function renderGrid() {
+            const displayMovies = getFilteredAndSortedMovies();
+            movieGrid.innerHTML = '';
+
+            if (displayMovies.length === 0) {
+                movieGrid.innerHTML = `
+                    <div class="col-span-full py-16 text-center text-zinc-500">
+                        <i class="fa-solid fa-filter-circle-xmark text-5xl mb-3 text-zinc-700"></i>
+                        <p class="text-base">No movies match your filter or search criteria.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            displayMovies.forEach(movie => {
+                const originalIndex = movies.findIndex(m => m === movie);
+                const card = document.createElement('div');
+                card.className = 'group relative bg-netflixCard rounded-lg overflow-hidden shadow-md hover:shadow-2xl transition duration-300 transform hover:-translate-y-2 cursor-pointer flex flex-col glow-hover';
+                card.onclick = () => openPlayer(originalIndex);
+
+                const posterDiv = document.createElement('div');
+                posterDiv.id = `thumb-${originalIndex}`;
+                posterDiv.className = 'relative w-full h-52 md:h-60 bg-zinc-900 flex items-center justify-center overflow-hidden';
+                
+                if (movie.thumbnailUrl) {
+                    posterDiv.style.backgroundImage = `url('${movie.thumbnailUrl}')`;
+                    posterDiv.style.backgroundSize = 'cover';
+                    posterDiv.style.backgroundPosition = 'center';
+                }
+
+                posterDiv.innerHTML = `
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-80 z-10"></div>
+                    ${!movie.thumbnailUrl ? `
+                        <div class="text-center z-0 p-4">
+                            <i class="fa-solid fa-clapperboard text-4xl text-zinc-700 group-hover:text-netflixRed transition duration-300"></i>
+                            <p class="text-xs uppercase font-bold tracking-widest text-zinc-500 mt-2">${movie.format}</p>
+                        </div>
+                    ` : ''}
+                    <div class="absolute top-2 right-2 z-20 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-mono text-zinc-300">
+                        ${formatBytes(movie.size)}
+                    </div>
+                    ${movie.duration ? `
+                        <div class="absolute bottom-2 right-2 z-20 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-mono text-zinc-300" id="dur-${originalIndex}">
+                            ${formatDuration(movie.duration)}
+                        </div>
+                    ` : ''}
+                    <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300 z-20 bg-black/40">
+                        <div class="w-12 h-12 bg-netflixRed text-white rounded-full flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition">
+                            <i class="fa-solid fa-play ml-0.5"></i>
+                        </div>
+                    </div>
+                    ${movie.progress > 0 ? `
+                        <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-zinc-800 z-20">
+                            <div class="h-full bg-netflixRed" style="width: ${movie.progress}%"></div>
+                        </div>
+                    ` : ''}
+                `;
+
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'p-3.5 flex flex-col justify-between flex-1 bg-netflixCard';
+                infoDiv.innerHTML = `
+                    <h3 class="text-sm font-medium text-white line-clamp-2 leading-snug group-hover:text-netflixRed transition" title="${movie.cleanName}">
+                        ${movie.cleanName}
+                    </h3>
+                    <div class="flex items-center justify-between mt-3 text-[11px] text-zinc-400">
+                        <span>${new Date(movie.lastModified).toLocaleDateString()}</span>
+                        <span class="uppercase tracking-wider font-semibold text-zinc-500">${movie.format}</span>
+                    </div>
+                `;
+
+                card.appendChild(posterDiv);
+                card.appendChild(infoDiv);
+                movieGrid.appendChild(card);
+            });
+        }
+
+        // Video Player Open / Close & Subtitle Inbuilt Scanner
+        function openPlayer(index) {
+            currentMovieIndex = index;
+            const movie = movies[index];
+            modalMovieTitle.textContent = movie.cleanName;
+
+            // --- Bug fix: previously, <track> elements (inbuilt + any externally
+            // uploaded subtitle) from the LAST movie were never removed, so opening
+            // a second movie left stale/duplicate tracks attached to <video>, which
+            // could scramble subtitle indices. Wipe them before loading the new file. ---
+            Array.from(videoPlayer.querySelectorAll('track')).forEach(t => t.remove());
+            embeddedSubtitleTracks = {};
+
+            // --- Bug fix: the previous blob: URL was never revoked, leaking memory
+            // every time a movie was opened. ---
+            if (currentObjectURL) URL.revokeObjectURL(currentObjectURL);
+            currentObjectURL = URL.createObjectURL(movie.file);
+            videoPlayer.src = currentObjectURL;
+
+            // Reset subtitle & audio-track menus for the new movie
+            subtitlesMenu.innerHTML = '<option value="off">Subtitles: Off</option>';
+            audioTrackMenu.innerHTML = '';
+            audioTrackWrap.classList.add('hidden');
+            audioTrackWrap.classList.remove('flex');
+            progressBar.value = 0;
+            updateRangeFill(progressBar);
+
+            playerModal.classList.remove('hidden');
+            playerModal.classList.add('flex', 'fade-in');
+            showControls();
+
+            videoPlayer.onloadedmetadata = () => {
+                // Scan for inbuilt/embedded text tracks the browser itself parsed out
+                // (this works for MP4/WebM files muxed with a real WebVTT/tx3g text
+                // track - it will NOT find anything for MKV, see note below).
+                if (videoPlayer.textTracks && videoPlayer.textTracks.length > 0) {
+                    for (let i = 0; i < videoPlayer.textTracks.length; i++) {
+                        const track = videoPlayer.textTracks[i];
+                        track.mode = 'hidden';
+                        const opt = document.createElement('option');
+                        opt.value = i;
+                        opt.textContent = track.label || `Inbuilt Subtitle #${i + 1}`;
+                        subtitlesMenu.appendChild(opt);
+                    }
+                }
+
+                // Multi audio-track support (VLC-style dub/commentary switching),
+                // where the browser exposes it (Chrome/Edge desktop today).
+                populateAudioTracks();
+
+                if (movie.currentTime > 5 && movie.currentTime < videoPlayer.duration - 5) {
+                    videoPlayer.currentTime = movie.currentTime;
+                }
+                videoPlayer.play().catch(err => console.log("Autoplay restriction prevented auto-start:", err));
+                updatePlayState(true);
+            };
+
+            // Browsers never expose subtitles/audio muxed INSIDE an .mkv container
+            // through textTracks/audioTracks (Matroska demuxing for embedded text
+            // isn't part of the HTML5 media spec support). To get those subtitles
+            // out we parse the raw MKV ourselves, client-side, with no ffmpeg.
+            if (movie.format === 'mkv') {
+                extractEmbeddedMkvSubtitles(movie);
+            }
+
+            // Mobile Auto-Rotation & Landscape lock if supported
+            if (screen.orientation && typeof screen.orientation.lock === 'function') {
+                screen.orientation.lock('landscape').catch(() => {});
+            }
+        }
+
+        function closePlayer() {
+            if (currentMovieIndex !== null) {
+                const movie = movies[currentMovieIndex];
+                watchHistory[movie.name] = {
+                    currentTime: videoPlayer.currentTime,
+                    progress: (videoPlayer.currentTime / videoPlayer.duration) * 100 || 0
+                };
+                localStorage.setItem('netflix_watch_history', JSON.stringify(watchHistory));
+                movie.currentTime = videoPlayer.currentTime;
+                movie.progress = watchHistory[movie.name].progress;
+                renderGrid();
+            }
+
+            videoPlayer.pause();
+            videoPlayer.src = '';
+            if (currentObjectURL) {
+                URL.revokeObjectURL(currentObjectURL);
+                currentObjectURL = null;
+            }
+            playerModal.classList.remove('flex');
+            playerModal.classList.add('hidden');
+
+            if (screen.orientation && typeof screen.orientation.unlock === 'function') {
+                screen.orientation.unlock();
+            }
+        }
+
+        // --- Auto-hide overlay controls during playback ---
+        // Bug fix: the top/bottom bars only ever changed opacity slightly on
+        // :hover - they were never actually hidden, so during playback they sat
+        // on top of the video (and any subtitles) permanently.
+        let controlsHideTimer = null;
+        function showControls() {
+            playerTopBar.classList.remove('controls-hidden');
+            playerControls.classList.remove('controls-hidden');
+            videoContainer.classList.remove('cursor-hidden');
+            scheduleAutoHide();
+        }
+        function scheduleAutoHide() {
+            clearTimeout(controlsHideTimer);
+            if (videoPlayer.paused) return; // never auto-hide while paused
+            controlsHideTimer = setTimeout(() => {
+                playerTopBar.classList.add('controls-hidden');
+                playerControls.classList.add('controls-hidden');
+                videoContainer.classList.add('cursor-hidden');
+            }, 3000);
+        }
+        ['mousemove', 'touchstart', 'mousedown'].forEach(evt => {
+            playerModal.addEventListener(evt, () => {
+                if (!playerModal.classList.contains('hidden')) showControls();
+            });
+        });
+        // Don't auto-hide while the pointer is actually resting on the controls
+        [playerTopBar, playerControls].forEach(bar => {
+            bar.addEventListener('mouseenter', () => clearTimeout(controlsHideTimer));
+            bar.addEventListener('mouseleave', () => scheduleAutoHide());
+        });
+        videoPlayer.addEventListener('play', scheduleAutoHide);
+        videoPlayer.addEventListener('pause', showControls);
+
+        // Multi audio-track selector - only shown when the file actually has more
+        // than one audio track and the browser supports HTMLMediaElement.audioTracks
+        // (currently Chrome/Edge desktop; Firefox/Safari don't expose this yet).
+        function populateAudioTracks() {
+            if (!videoPlayer.audioTracks || videoPlayer.audioTracks.length <= 1) return;
+            audioTrackMenu.innerHTML = '';
+            for (let i = 0; i < videoPlayer.audioTracks.length; i++) {
+                const at = videoPlayer.audioTracks[i];
+                const opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = at.label || at.language || `Audio Track ${i + 1}`;
+                opt.selected = at.enabled;
+                audioTrackMenu.appendChild(opt);
+            }
+            audioTrackWrap.classList.remove('hidden');
+            audioTrackWrap.classList.add('flex');
+        }
+
+        audioTrackMenu.addEventListener('change', (e) => {
+            const selected = parseInt(e.target.value, 10);
+            for (let i = 0; i < videoPlayer.audioTracks.length; i++) {
+                videoPlayer.audioTracks[i].enabled = (i === selected);
+            }
+        });
+
+        function clearHistory() {
+            if (confirm('Clear all watch history and progress?')) {
+                localStorage.removeItem('netflix_watch_history');
+                watchHistory = {};
+                movies.forEach(m => { m.progress = 0; m.currentTime = 0; });
+                renderGrid();
+                showNotification('Watch history cleared successfully.', 'success');
+            }
+        }
+
+        function showNotification(msg, type = 'success') {
+            const div = document.createElement('div');
+            div.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-md shadow-2xl text-sm font-medium text-white flex items-center gap-2 transition duration-300 ${type === 'error' ? 'bg-netflixRed' : 'bg-zinc-800 border border-zinc-700'}`;
+            div.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-triangle-exclamation text-white' : 'fa-circle-check text-green-500'}"></i> ${msg}`;
+            document.body.appendChild(div);
+            setTimeout(() => {
+                div.style.opacity = '0';
+                setTimeout(() => div.remove(), 300);
+            }, 3000);
+        }
+
+        // Convert SRT subtitle text into valid WebVTT. Bug fix: the HTML5 <track>
+        // element only understands WebVTT - it will silently show nothing for a
+        // raw .srt file, because SRT uses a comma for the ms separator and has no
+        // "WEBVTT" header. That mismatch, not a loading failure, was why uploaded
+        // .srt files never appeared.
+        function srtToVtt(text) {
+            let body = text.replace(/^\uFEFF/, '').replace(/\r+/g, '');
+            if (/^WEBVTT/.test(body.trim())) return body; // already valid VTT
+            body = body.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+            return 'WEBVTT\n\n' + body.trim() + '\n';
+        }
+
+        // Strip ASS/SSA style override codes (e.g. "{\an8}", "{\c&H...&}") and
+        // literal "\N" line-break markers so embedded .ass subtitles read as
+        // plain text instead of showing raw formatting tags.
+        function stripAssTags(text) {
+            return text.replace(/\{[^}]*\}/g, '').replace(/\\N/gi, '\n').trim();
+        }
+
+        // Subtitle external file upload handler (.srt / .vtt)
+        subtitleInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                const rawText = await file.text();
+                const isVtt = /\.vtt$/i.test(file.name);
+                const vttText = isVtt ? rawText : srtToVtt(rawText);
+                const subURL = URL.createObjectURL(new Blob([vttText], { type: 'text/vtt' }));
+
+                const track = document.createElement('track');
+                track.kind = 'subtitles';
+                track.label = file.name;
+                track.srclang = 'en';
+                track.src = subURL;
+
+                videoPlayer.appendChild(track);
+
+                const newIndex = videoPlayer.textTracks.length - 1;
+                const opt = document.createElement('option');
+                opt.value = newIndex;
+                opt.textContent = `External: ${file.name}`;
+                opt.selected = true;
+                subtitlesMenu.appendChild(opt);
+
+                for (let i = 0; i < videoPlayer.textTracks.length; i++) {
+                    videoPlayer.textTracks[i].mode = (i === newIndex) ? 'showing' : 'hidden';
+                }
+                showNotification(`Loaded subtitle: ${file.name}`);
+            } catch (err) {
+                console.error('Subtitle load failed:', err);
+                showNotification('Could not read that subtitle file.', 'error');
+            } finally {
+                subtitleInput.value = ''; // allow re-selecting the same file next time
+            }
+        });
+
+        subtitlesMenu.addEventListener('change', (e) => {
+            const val = e.target.value;
+            for (let i = 0; i < videoPlayer.textTracks.length; i++) {
+                if (val === 'off') {
+                    videoPlayer.textTracks[i].mode = 'hidden';
+                } else {
+                    videoPlayer.textTracks[i].mode = (i == val) ? 'showing' : 'hidden';
+                }
+            }
+        });
+
+        // --- Embedded .mkv subtitle extraction ---
+        // Browsers never surface subtitle tracks that are muxed INSIDE a Matroska
+        // (.mkv) container through videoPlayer.textTracks - that API only sees
+        // WebVTT/tx3g text tracks in MP4/WebM. To make inbuilt MKV subtitles work
+        // we parse the raw container ourselves in JS (matroska-subtitles, loaded
+        // above) and feed what we find into real TextTracks via addTextTrack(),
+        // so they behave exactly like any other subtitle option in the dropdown.
+        // This is best-effort: it needs that small script to have loaded from
+        // the CDN once (internet required the first time), and large files take
+        // a little while to fully scan since it reads through the file.
+        function extractEmbeddedMkvSubtitles(movie) {
+            const lib = window.matroskaSubtitles || window.MatroskaSubtitles || window['matroska-subtitles'];
+            if (!lib || !lib.SubtitleParser) {
+                if (window.__mkvSubsLoadFailed) {
+                    console.warn('Embedded MKV subtitle extractor failed to load (offline?) - external .srt/.vtt upload still works.');
+                }
+                return;
+            }
+
+            let parser;
+            try {
+                parser = new lib.SubtitleParser();
+            } catch (err) {
+                console.warn('Could not start MKV subtitle parser:', err);
+                return;
+            }
+
+            const trackNumberToTextTrack = {};
+
+            parser.once('tracks', (tracks) => {
+                if (!tracks || tracks.length === 0) return;
+                tracks.forEach((t) => {
+                    const tt = videoPlayer.addTextTrack('subtitles', t.name || t.language || `Embedded ${t.number}`, t.language || '');
+                    tt.mode = 'hidden';
+                    trackNumberToTextTrack[t.number] = tt;
+
+                    const newIndex = videoPlayer.textTracks.length - 1;
+                    const opt = document.createElement('option');
+                    opt.value = newIndex;
+                    opt.textContent = `Embedded: ${t.name || t.language || 'Track ' + t.number}`;
+                    subtitlesMenu.appendChild(opt);
+                });
+                showNotification('Embedded subtitle track(s) found in this MKV.');
+            });
+
+            parser.on('subtitle', (sub, trackNumber) => {
+                const tt = trackNumberToTextTrack[trackNumber];
+                if (!tt || !sub || typeof sub.time !== 'number') return;
+                const start = sub.time / 1000;
+                const end = start + (sub.duration || 2000) / 1000;
+                try {
+                    tt.addCue(new VTTCue(start, end, stripAssTags(sub.text || '')));
+                } catch (err) {
+                    // A malformed cue shouldn't stop the rest of the subtitles from loading
+                }
+            });
+
+            // Stream the file into the parser in chunks rather than loading the
+            // whole (potentially multi-GB) file into memory at once.
+            const reader = movie.file.stream().getReader();
+            (function pump() {
+                reader.read().then(({ done, value }) => {
+                    if (done) { try { parser.end && parser.end(); } catch (e) {} return; }
+                    try { parser.write(value); } catch (err) { console.warn('MKV parse stopped:', err); return; }
+                    pump();
+                }).catch((err) => console.warn('MKV subtitle scan stopped:', err));
+            })();
+        }
+
+        // Player Controls & Time format
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            const hrs = Math.floor(mins / 60);
+            const remMins = mins % 60;
+            if (hrs > 0) {
+                return `${hrs}:${remMins < 10 ? '0' : ''}${remMins}:${secs < 10 ? '0' : ''}${secs}`;
+            }
+            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+
+        // Bug fix: input[type=range] doesn't fill itself - it needs a background
+        // gradient recomputed on every value change, which nothing was doing.
+        function updateRangeFill(el) {
+            const min = parseFloat(el.min) || 0;
+            const max = parseFloat(el.max) || 100;
+            const pct = max > min ? ((el.value - min) / (max - min)) * 100 : 0;
+            el.style.background = `linear-gradient(to right, #E50914 0%, #E50914 ${pct}%, #4b5563 ${pct}%, #4b5563 100%)`;
+        }
+
+        videoPlayer.addEventListener('timeupdate', () => {
+            if (!isNaN(videoPlayer.duration)) {
+                const percent = (videoPlayer.currentTime / videoPlayer.duration) * 100;
+                progressBar.value = percent;
+                updateRangeFill(progressBar);
+                currentTimeDisplay.textContent = formatTime(videoPlayer.currentTime);
+                durationDisplay.textContent = formatTime(videoPlayer.duration);
+            }
+        });
+
+        progressBar.addEventListener('input', (e) => {
+            updateRangeFill(progressBar);
+            if (!isNaN(videoPlayer.duration)) {
+                const time = (e.target.value / 100) * videoPlayer.duration;
+                videoPlayer.currentTime = time;
+            }
+        });
+
+        playPauseBtn.addEventListener('click', togglePlay);
+        videoContainer.addEventListener('click', (e) => {
+            if (e.target === videoContainer || e.target === videoPlayer) {
+                togglePlay();
+                showPlayIndicator();
+            }
+        });
+
+        function togglePlay() {
+            if (videoPlayer.paused) {
+                videoPlayer.play();
+                updatePlayState(true);
+            } else {
+                videoPlayer.pause();
+                updatePlayState(false);
+            }
+        }
+
+        function updatePlayState(isPlaying) {
+            playPauseIcon.className = isPlaying ? "fa-solid fa-pause" : "fa-solid fa-play";
+        }
+
+        function showPlayIndicator() {
+            centerPlayIcon.className = videoPlayer.paused ? "fa-solid fa-play" : "fa-solid fa-pause";
+            centerPlayIndicator.style.opacity = '1';
+            setTimeout(() => {
+                centerPlayIndicator.style.opacity = '0';
+            }, 400);
+        }
+
+        function skipTime(seconds) {
+            videoPlayer.currentTime += seconds;
+        }
+
+        muteBtn.addEventListener('click', () => {
+            videoPlayer.muted = !videoPlayer.muted;
+            volumeIcon.className = videoPlayer.muted || videoPlayer.volume === 0 ? "fa-solid fa-volume-xmark text-netflixRed" : "fa-solid fa-volume-high";
+            volumeBar.value = videoPlayer.muted ? 0 : videoPlayer.volume;
+            updateRangeFill(volumeBar);
+        });
+
+        volumeBar.addEventListener('input', (e) => {
+            videoPlayer.volume = e.target.value;
+            videoPlayer.muted = videoPlayer.volume === 0;
+            volumeIcon.className = videoPlayer.volume === 0 ? "fa-solid fa-volume-xmark text-netflixRed" : "fa-solid fa-volume-high";
+            updateRangeFill(volumeBar);
+        });
+
+        // Initial fill so the bars aren't flat-grey before anything plays
+        updateRangeFill(progressBar);
+        updateRangeFill(volumeBar);
+
+        playbackSpeed.addEventListener('change', (e) => {
+            videoPlayer.playbackRate = parseFloat(e.target.value);
+        });
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                playerModal.requestFullscreen().catch(err => console.log(err));
+                fullscreenIcon.className = "fa-solid fa-compress text-lg";
+            } else {
+                document.exitFullscreen();
+                fullscreenIcon.className = "fa-solid fa-expand text-lg";
+            }
+        }
+
+        // Keyboard Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (playerModal.classList.contains('hidden')) return;
+
+            if (e.code === 'Space') {
+                e.preventDefault();
+                togglePlay();
+                showPlayIndicator();
+            } else if (e.code === 'ArrowRight') {
+                skipTime(10);
+            } else if (e.code === 'ArrowLeft') {
+                skipTime(-10);
+            } else if (e.code === 'KeyF') {
+                toggleFullscreen();
+            } else if (e.code === 'Escape') {
+                closePlayer();
+            }
+        });
+
+        // ==================== Watch Party ====================
+        // Host's browser is the hub: every guest connects to the host, and the
+        // host relays chat + sync messages to everyone else (a "star" topology).
+        // PeerJS's free public broker only helps browsers find each other -
+        // once connected, everything travels directly peer-to-peer. Nothing
+        // about the movie file itself is ever sent anywhere. Close the host
+        // tab and every connection drops immediately - there's no lingering
+        // server.
+        const partyModal = document.getElementById('partyModal');
+        const partyStatusBadge = document.getElementById('partyStatusBadge');
+        const partyChatToggle = document.getElementById('partyChatToggle');
+        const partyChatPanel = document.getElementById('partyChatPanel');
+        const playerPartyChatBtn = document.getElementById('playerPartyChatBtn');
+
+        let peer = null;
+        let isPartyHost = false;
+        let partyCode = null;
+        let partyName = '';
+        let hostConnection = null;          // guest's connection to the host
+        const guestConnections = new Map(); // host-side: peerId -> { conn, name }
+        let applyingRemoteSync = false;      // guard so applying a sync doesn't re-broadcast it
+        let chatUnread = 0;
+
+        const PARTY_PREFIX = 'localflix-party-';
+
+        function randomPartyCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous-looking chars
+            let code = '';
+            for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+            return code;
+        }
+
+        function openPartyModal() {
+            if (window.__peerJsLoadFailed) {
+                showNotification('Watch Party needs internet on first load and could not start.', 'error');
+                return;
+            }
+            partyModal.classList.remove('hidden');
+            partyModal.classList.add('flex');
+            showPartyPane(partyCode ? 'partyActive' : 'partyIdle');
+        }
+        function closePartyModal() {
+            partyModal.classList.add('hidden');
+            partyModal.classList.remove('flex');
+        }
+        function showPartyPane(id) {
+            ['partyIdle', 'partyConnecting', 'partyActive'].forEach(p => {
+                document.getElementById(p).classList.toggle('hidden', p !== id);
+            });
+        }
+
+        function initPeer(id) {
+            return new Promise((resolve, reject) => {
+                if (typeof Peer === 'undefined') {
+                    reject(new Error('library failed to load (are you online?)'));
+                    return;
+                }
+                const p = id ? new Peer(id) : new Peer();
+                p.on('open', () => resolve(p));
+                p.on('error', (err) => reject(err));
+            });
+        }
+
+        async function createParty() {
+            partyName = (document.getElementById('partyNameInput').value || 'Host').trim().slice(0, 20) || 'Host';
+            showPartyPane('partyConnecting');
+            document.getElementById('partyConnectingText').textContent = 'Starting your watch party…';
+            const code = randomPartyCode();
+            try {
+                peer = await initPeer(PARTY_PREFIX + code);
+                isPartyHost = true;
+                partyCode = code;
+                peer.on('connection', (conn) => setupHostConnection(conn));
+                peer.on('disconnected', () => showNotification('Watch party connection dropped.', 'error'));
+                showPartyActivePanel();
+                showNotification('Watch party started — share the link with others.', 'success');
+            } catch (err) {
+                console.error(err);
+                showPartyPane('partyIdle');
+                const msg = (err && err.type === 'unavailable-id')
+                    ? 'That happens rarely - just try again.'
+                    : (err.message || 'unknown error');
+                showNotification('Could not start watch party: ' + msg, 'error');
+            }
+        }
+
+        async function joinParty(codeArg) {
+            const code = (codeArg || document.getElementById('joinCodeInput').value || '').trim().toUpperCase();
+            if (!code) { showNotification('Enter a party code first.', 'error'); return; }
+            partyName = (document.getElementById('partyNameInput').value || 'Guest').trim().slice(0, 20) || 'Guest';
+            showPartyPane('partyConnecting');
+            document.getElementById('partyConnectingText').textContent = 'Joining watch party…';
+            try {
+                peer = await initPeer(null);
+                isPartyHost = false;
+                const conn = peer.connect(PARTY_PREFIX + code, { reliable: true });
+                let settled = false;
+                const timeout = setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    showPartyPane('partyIdle');
+                    showNotification('Could not reach that party (wrong code, or the host closed it).', 'error');
+                }, 12000);
+                conn.on('open', () => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeout);
+                    hostConnection = conn;
+                    partyCode = code;
+                    wireConnection(conn);
+                    conn.send({ type: 'hello', name: partyName });
+                    showPartyActivePanel();
+                    showNotification('Joined the watch party!', 'success');
+                });
+                conn.on('error', (err) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timeout);
+                    showPartyPane('partyIdle');
+                    showNotification('Could not join party: ' + (err.message || 'connection failed'), 'error');
+                });
+            } catch (err) {
+                console.error(err);
+                showPartyPane('partyIdle');
+                showNotification('Watch Party is unavailable: ' + (err.message || 'unknown error'), 'error');
+            }
+        }
+
+        function setupHostConnection(conn) {
+            conn.on('open', () => {
+                guestConnections.set(conn.peer, { conn, name: 'Guest' });
+                updateMemberCount();
+            });
+            wireConnection(conn);
+            conn.on('close', () => {
+                const entry = guestConnections.get(conn.peer);
+                guestConnections.delete(conn.peer);
+                updateMemberCount();
+                if (entry) {
+                    addChatSystemMessage(`${entry.name} left the party.`);
+                    broadcastToGuests({ type: 'chat', system: true, text: `${entry.name} left the party.` });
+                }
+            });
+        }
+
+        function wireConnection(conn) {
+            conn.on('data', (data) => handlePartyData(data, conn));
+            if (!isPartyHost) {
+                conn.on('close', () => {
+                    showNotification('The host ended the watch party.', 'error');
+                    resetPartyState();
+                });
+            }
+        }
+
+        function handlePartyData(data, fromConn) {
+            if (!data || !data.type) return;
+            if (data.type === 'hello') {
+                if (isPartyHost) {
+                    const entry = guestConnections.get(fromConn.peer);
+                    if (entry) entry.name = (data.name || 'Guest').slice(0, 20);
+                    updateMemberCount();
+                    const msg = `${entry ? entry.name : 'Someone'} joined the party.`;
+                    addChatSystemMessage(msg);
+                    broadcastToGuests({ type: 'chat', system: true, text: msg }, fromConn.peer);
+                }
+                return;
+            }
+            if (data.type === 'chat') {
+                addChatMessage(data.name, data.text, data.system);
+                if (isPartyHost) broadcastToGuests(data, fromConn.peer); // relay to everyone else
+                return;
+            }
+            if (data.type === 'sync') {
+                applyRemoteSync(data);
+                if (isPartyHost) broadcastToGuests(data, fromConn.peer);
+                return;
+            }
+            if (data.type === 'reaction') {
+                spawnFloatingReaction(data.emoji);
+                if (isPartyHost) broadcastToGuests(data, fromConn.peer);
+                return;
+            }
+        }
+
+        // ---- Reactions: tiny, ephemeral P2P messages, never stored anywhere ----
+        const REACTION_EMOJIS = ['❤️', '😂', '🔥', '👏', '😮', '👍'];
+        (function buildReactionBar() {
+            const bar = document.getElementById('reactionBar');
+            REACTION_EMOJIS.forEach(emoji => {
+                const btn = document.createElement('button');
+                btn.className = 'reaction-btn text-xl leading-none py-1 flex-1 rounded-md hover:bg-zinc-800 transition';
+                btn.textContent = emoji;
+                btn.title = 'Send reaction';
+                btn.onclick = () => sendReaction(emoji);
+                bar.appendChild(btn);
+            });
+        })();
+
+        function sendReaction(emoji) {
+            if (!partyCode) return;
+            spawnFloatingReaction(emoji); // show it locally right away, no round-trip needed
+            sendPartyData({ type: 'reaction', emoji });
+        }
+
+        function spawnFloatingReaction(emoji) {
+            const layer = document.getElementById('reactionLayer');
+            const el = document.createElement('span');
+            el.className = 'floating-reaction';
+            el.textContent = emoji || '❤️';
+            el.style.left = (8 + Math.random() * 70) + 'vw';
+            el.style.animationDuration = (2.2 + Math.random() * 0.8) + 's';
+            layer.appendChild(el);
+            el.addEventListener('animationend', () => el.remove());
+        }
+
+        function broadcastToGuests(data, exceptPeerId) {
+            guestConnections.forEach((entry, peerId) => {
+                if (peerId === exceptPeerId) return;
+                try { entry.conn.send(data); } catch (e) {}
+            });
+        }
+
+        function sendPartyData(data) {
+            if (isPartyHost) {
+                broadcastToGuests(data);
+                if (data.type === 'chat') addChatMessage(data.name, data.text, data.system);
+            } else if (hostConnection) {
+                try { hostConnection.send(data); } catch (e) {}
+            }
+        }
+
+        function showPartyActivePanel() {
+            showPartyPane('partyActive');
+            document.getElementById('partyCodeDisplay').textContent = partyCode;
+            document.getElementById('partyRoleNote').textContent = isPartyHost
+                ? 'You are hosting - play/pause/seek here syncs to everyone.'
+                : 'Connected as a guest. The host controls playback; you can still seek locally.';
+            document.getElementById('leavePartyLabel').textContent = isPartyHost ? 'End Watch Party' : 'Leave Watch Party';
+            updateMemberCount();
+            partyStatusBadge.classList.remove('hidden');
+            partyStatusBadge.classList.add('flex');
+            document.getElementById('partyStatusText').textContent = isPartyHost ? `Hosting ${partyCode}` : `In party ${partyCode}`;
+            partyChatToggle.classList.remove('hidden');
+            playerPartyChatBtn.classList.remove('hidden');
+        }
+
+        function updateMemberCount() {
+            const count = isPartyHost ? guestConnections.size + 1 : 2; // a guest only knows "host + me"
+            document.getElementById('partyMemberCount').textContent = count;
+            document.getElementById('partyChatCount').textContent = isPartyHost ? `(${count})` : '';
+        }
+
+        function copyPartyLink() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('party', partyCode);
+            const text = url.toString();
+            navigator.clipboard.writeText(text).then(() => {
+                showNotification('Party link copied to clipboard.', 'success');
+            }).catch(() => {
+                showNotification('Could not copy automatically. Link: ' + text, 'error');
+            });
+        }
+
+        function leaveParty() {
+            if (isPartyHost) {
+                broadcastToGuests({ type: 'chat', system: true, text: 'Host ended the watch party.' });
+                guestConnections.forEach(entry => { try { entry.conn.close(); } catch (e) {} });
+            } else if (hostConnection) {
+                try { hostConnection.close(); } catch (e) {}
+            }
+            resetPartyState();
+            showNotification('Left the watch party.', 'success');
+        }
+
+        function resetPartyState() {
+            if (peer) { try { peer.destroy(); } catch (e) {} }
+            peer = null;
+            isPartyHost = false;
+            partyCode = null;
+            hostConnection = null;
+            guestConnections.clear();
+            partyStatusBadge.classList.add('hidden');
+            partyStatusBadge.classList.remove('flex');
+            partyChatToggle.classList.add('hidden');
+            partyChatPanel.classList.add('hidden');
+            partyChatPanel.classList.remove('flex');
+            playerPartyChatBtn.classList.add('hidden');
+            closePartyModal();
+            showPartyPane('partyIdle');
+        }
+
+        // Chat UI
+        function togglePartyChat() {
+            const isHidden = partyChatPanel.classList.contains('hidden');
+            if (isHidden) {
+                partyChatPanel.classList.remove('hidden');
+                partyChatPanel.classList.add('flex');
+                chatUnread = 0;
+                document.getElementById('partyChatBadge').classList.add('hidden');
+                document.getElementById('partyChatInput').focus();
+            } else {
+                partyChatPanel.classList.add('hidden');
+                partyChatPanel.classList.remove('flex');
+            }
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str == null ? '' : str;
+            return div.innerHTML;
+        }
+
+        function addChatMessage(name, text, system) {
+            const wrap = document.getElementById('partyChatMessages');
+            const div = document.createElement('div');
+            if (system) {
+                div.className = 'text-xs text-zinc-500 italic text-center';
+                div.textContent = text;
+            } else {
+                div.className = 'text-zinc-200';
+                div.innerHTML = `<span class="font-semibold text-netflixRed">${escapeHtml(name || 'Someone')}:</span> <span class="break-words">${escapeHtml(text)}</span>`;
+            }
+            wrap.appendChild(div);
+            wrap.scrollTop = wrap.scrollHeight;
+
+            if (partyChatPanel.classList.contains('hidden')) {
+                chatUnread++;
+                const badge = document.getElementById('partyChatBadge');
+                badge.textContent = chatUnread > 9 ? '9+' : chatUnread;
+                badge.classList.remove('hidden');
+            }
+        }
+        function addChatSystemMessage(text) { addChatMessage(null, text, true); }
+
+        function sendPartyChat() {
+            const input = document.getElementById('partyChatInput');
+            const text = input.value.trim();
+            if (!text || !partyCode) return;
+            sendPartyData({ type: 'chat', name: partyName, text });
+            input.value = '';
+        }
+        document.getElementById('partyChatInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendPartyChat();
+        });
+
+        // Playback sync - fires on real local interaction, guarded so an
+        // incoming sync we apply doesn't get re-broadcast right back out.
+        function broadcastSync() {
+            if (!partyCode || applyingRemoteSync) return;
+            sendPartyData({
+                type: 'sync',
+                time: videoPlayer.currentTime,
+                playing: !videoPlayer.paused,
+                title: (currentMovieIndex !== null && movies[currentMovieIndex]) ? movies[currentMovieIndex].name : null
+            });
+        }
+
+        function applyRemoteSync(data) {
+            if (playerModal.classList.contains('hidden')) {
+                showNotification('Party: the host changed playback - open your copy of the movie to follow along.');
+                return;
+            }
+            applyingRemoteSync = true;
+            if (typeof data.time === 'number' && Math.abs(videoPlayer.currentTime - data.time) > 1.5) {
+                videoPlayer.currentTime = data.time;
+            }
+            if (data.playing && videoPlayer.paused) { videoPlayer.play(); updatePlayState(true); }
+            if (!data.playing && !videoPlayer.paused) { videoPlayer.pause(); updatePlayState(false); }
+            setTimeout(() => { applyingRemoteSync = false; }, 300);
+        }
+
+        playPauseBtn.addEventListener('click', () => setTimeout(broadcastSync, 0));
+        progressBar.addEventListener('change', broadcastSync);
+
+        // Auto-prompt to join if this page was opened via a party link
+        (function checkPartyLinkOnLoad() {
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get('party');
+            if (code) {
+                openPartyModal();
+                document.getElementById('joinCodeInput').value = code.toUpperCase();
+                showNotification(`This link is for watch party ${code.toUpperCase()} - enter a name and hit Join.`);
+            }
+        })();
+    </script>
+</body>
+</html>
