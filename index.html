@@ -380,7 +380,7 @@
 
         <!-- Video Container -->
         <div class="relative w-full h-full flex items-center justify-center cursor-pointer" id="videoContainer">
-            <video id="videoPlayer" class="max-w-full max-h-full object-contain" crossorigin="anonymous" playsinline>
+            <video id="videoPlayer" class="max-w-full max-h-full object-contain" crossorigin="anonymous" playsinline autoplay></video>
                 Your browser does not support the video tag.
             </video>
             <!-- Shown while the file is loading, hidden as soon as it's ready or errors out -->
@@ -787,6 +787,7 @@
                 // silently didn't start still looked like it was playing.
                 videoPlayer.play().then(() => {
                     updatePlayState(true);
+                    if (isPartyHost) setTimeout(callAllGuestsWithVideo, 100);
                 }).catch(err => {
                     console.log("Autoplay restriction prevented auto-start:", err);
                     updatePlayState(false);
@@ -824,6 +825,10 @@
 
             videoPlayer.pause();
             videoPlayer.src = '';
+            videoPlayer.srcObject = null;
+            videoPlayer.muted = false;
+            remotePartyPlayback = false;
+            pendingPartyStream = null;
             if (currentObjectURL) {
                 URL.revokeObjectURL(currentObjectURL);
                 currentObjectURL = null;
@@ -1232,6 +1237,9 @@
         const guestConnections = new Map(); // host-side: peerId -> { conn, name }
         let applyingRemoteSync = false;      // guard so applying a sync doesn't re-broadcast it
         let chatUnread = 0;
+        let pendingPartyStream = null;
+        const partyMediaCalls = new Map();
+        let remotePartyPlayback = false;
 
         const PARTY_PREFIX = 'localflix-party-';
 
@@ -1277,6 +1285,114 @@
             });
         }
 
+        // ==================== Watch Party Video Streaming ====================
+        // The movie file stays on the host device. For a true watch-party
+        // experience, the host's playing <video> element is captured as a
+        // WebRTC MediaStream and sent directly to each guest. Chat/reactions
+        // continue to use the existing PeerJS data connection.
+        function getPartyVideoStream() {
+            if (!isPartyHost || playerModal.classList.contains('hidden')) return null;
+            if (typeof videoPlayer.captureStream !== 'function') {
+                console.warn('MediaStream capture is not supported by this browser.');
+                return null;
+            }
+            try {
+                return videoPlayer.captureStream();
+            } catch (err) {
+                console.error('Could not capture host video stream:', err);
+                return null;
+            }
+        }
+
+        function callGuestWithVideo(conn) {
+            if (!isPartyHost || !conn || !peer) return;
+            const stream = getPartyVideoStream();
+            if (!stream) return;
+            try {
+                const oldCall = partyMediaCalls.get(conn.peer);
+                if (oldCall) {
+                    try { oldCall.close(); } catch (e) {}
+                }
+                const call = peer.call(conn.peer, stream, { metadata: { type: 'watch-party-video' } });
+                partyMediaCalls.set(conn.peer, call);
+                call.on('error', err => console.warn('Party video call error:', err));
+                call.on('close', () => {
+                    if (partyMediaCalls.get(conn.peer) === call) partyMediaCalls.delete(conn.peer);
+                });
+            } catch (err) {
+                console.error('Could not start party video call:', err);
+            }
+        }
+
+        function callAllGuestsWithVideo() {
+            if (!isPartyHost) return;
+            guestConnections.forEach(entry => callGuestWithVideo(entry.conn));
+        }
+
+        function handleIncomingPartyVideoCall(call) {
+            if (isPartyHost) return;
+            try {
+                call.answer(); // Guest sends no media back; host is the video source.
+                call.on('stream', stream => {
+                    pendingPartyStream = stream;
+                    if (remotePartyPlayback && !playerModal.classList.contains('hidden')) {
+                        videoPlayer.src = '';
+                        videoPlayer.srcObject = stream;
+                        videoPlayer.play().catch(err => {
+                            console.warn('Guest autoplay was blocked:', err);
+                            videoPlayer.muted = true;
+                            videoPlayer.play().catch(() => {});
+                            showNotification('Video connected. Click the video once to enable sound.');
+                        });
+                    }
+                });
+                call.on('close', () => {
+                    if (pendingPartyStream && pendingPartyStream === videoPlayer.srcObject) {
+                        pendingPartyStream = null;
+                    }
+                });
+                call.on('error', err => console.warn('Incoming party video error:', err));
+            } catch (err) {
+                console.error('Could not answer party video call:', err);
+            }
+        }
+
+        function openRemotePartyPlayer(title, stream = null) {
+            remotePartyPlayback = true;
+            currentMovieIndex = null;
+            modalMovieTitle.textContent = title || 'Watch Party';
+            if (currentObjectURL) {
+                URL.revokeObjectURL(currentObjectURL);
+                currentObjectURL = null;
+            }
+            videoPlayer.pause();
+            videoPlayer.removeAttribute('src');
+            if (stream) pendingPartyStream = stream;
+            if (pendingPartyStream) videoPlayer.srcObject = pendingPartyStream;
+            videoPlayer.muted = false;
+            playerModal.classList.remove('hidden');
+            playerModal.classList.add('flex', 'fade-in');
+            showControls();
+            document.getElementById('playerLoadingIndicator').classList.add('hidden');
+            document.getElementById('playerLoadingIndicator').classList.remove('flex');
+            if (videoPlayer.srcObject) {
+                videoPlayer.play().then(() => updatePlayState(true)).catch(err => {
+                    console.warn('Guest remote autoplay blocked:', err);
+                    videoPlayer.muted = true;
+                    videoPlayer.play().then(() => updatePlayState(true)).catch(() => updatePlayState(false));
+                    showNotification('Video connected. Click the video to enable sound.');
+                });
+            } else {
+                showNotification('Connected to the party. Waiting for the host video…');
+            }
+        }
+
+        // Guest video calls arrive independently from chat/sync data.
+        // Register this as soon as PeerJS is created so a guest does not miss it.
+        function enablePartyMediaReceiver() {
+            if (peer && !isPartyHost) peer.on('call', handleIncomingPartyVideoCall);
+        }
+
         async function createParty() {
             partyName = (document.getElementById('partyNameInput').value || 'Host').trim().slice(0, 20) || 'Host';
             showPartyPane('partyConnecting');
@@ -1310,6 +1426,7 @@
             try {
                 peer = await initPeer(null);
                 isPartyHost = false;
+                enablePartyMediaReceiver();
                 const conn = peer.connect(PARTY_PREFIX + code, { reliable: true });
                 let settled = false;
                 const timeout = setTimeout(() => {
@@ -1348,11 +1465,17 @@
             conn.on('open', () => {
                 guestConnections.set(conn.peer, { conn, name: 'Guest' });
                 updateMemberCount();
+                if (!playerModal.classList.contains('hidden')) {
+                    setTimeout(() => callGuestWithVideo(conn), 150);
+                }
             });
             wireConnection(conn);
             conn.on('close', () => {
                 const entry = guestConnections.get(conn.peer);
                 guestConnections.delete(conn.peer);
+                const mediaCall = partyMediaCalls.get(conn.peer);
+                if (mediaCall) { try { mediaCall.close(); } catch (e) {} }
+                partyMediaCalls.delete(conn.peer);
                 updateMemberCount();
                 if (entry) {
                     addChatSystemMessage(`${entry.name} left the party.`);
@@ -1395,26 +1518,14 @@
                 return;
             }
             if (data.type === 'movie-select') {
-                // The host is NOT sending the movie file. The guest must already
-                // have the same local file loaded. Match by exact filename first,
-                // then by clean title as a friendly fallback.
                 if (!isPartyHost) {
-                    const guestIndex = movies.findIndex(m =>
-                        (data.name && m.name === data.name) ||
-                        (!data.name && m.cleanName === data.title) ||
-                        (data.title && m.cleanName === data.title)
-                    );
-
-                    if (guestIndex >= 0) {
-                        partyRoomScreen.classList.add('hidden');
-                        partyRoomScreen.classList.remove('flex');
-                        setChatPanelMode('floating');
-                        openPlayer(guestIndex);
-                        addChatSystemMessage(`Host is playing "${data.title}". Your local copy was opened automatically.`);
-                    } else {
-                        addChatSystemMessage(`Host is playing "${data.title}" — load the same movie file into this tab to watch.`);
-                        showNotification(`Could not find "${data.title}" in your loaded movies. Load the same local file as the host.`, 'error');
-                    }
+                    // The guest does NOT need a local movie file. The host streams
+                    // the playing video element over WebRTC.
+                    partyRoomScreen.classList.add('hidden');
+                    partyRoomScreen.classList.remove('flex');
+                    setChatPanelMode('floating');
+                    openRemotePartyPlayer(data.title, pendingPartyStream);
+                    addChatSystemMessage(`Host is playing "${data.title}" — connecting to the host video…`);
                 } else {
                     addChatSystemMessage(`Host is playing "${data.title}".`);
                     broadcastToGuests(data, fromConn.peer);
@@ -1593,6 +1704,7 @@
             partyRoomScreen.classList.remove('flex');
             setChatPanelMode('floating');
             openPlayer(index);
+            if (isPartyHost) setTimeout(callAllGuestsWithVideo, 500);
         }
 
         function copyPartyLink() {
@@ -1618,6 +1730,8 @@
         }
 
         function resetPartyState() {
+            partyMediaCalls.forEach(call => { try { call.close(); } catch (e) {} });
+            partyMediaCalls.clear();
             if (peer) { try { peer.destroy(); } catch (e) {} }
             peer = null;
             isPartyHost = false;
