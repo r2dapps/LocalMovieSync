@@ -290,7 +290,7 @@
     </div>
 
     <!-- Watch Party: floating chat toggle + panel (visible once connected) -->
-    <div id="partyChatToggle" class="hidden fixed bottom-6 left-6 z-40">
+    <div id="partyChatToggle" class="hidden fixed bottom-6 left-6 z-[65]">
         <button onclick="togglePartyChat()" class="relative bg-netflixRed hover:bg-red-700 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-xl transition">
             <i class="fa-solid fa-comments"></i>
             <span id="partyChatBadge" class="hidden absolute -top-1 -right-1 bg-white text-netflixRed text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">0</span>
@@ -369,7 +369,7 @@
                         <input type="file" id="subtitleInput" accept=".srt,.vtt" class="hidden">
                     </label>
                 </div>
-                <button onclick="togglePartyChat()" id="playerPartyChatBtn" title="Party Chat" class="hidden text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition">
+                <button onclick="togglePartyChat()" id="playerPartyChatBtn" title="Party Chat" class="hidden relative z-[25] text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition">
                     <i class="fa-solid fa-comments text-lg"></i>
                 </button>
                 <button onclick="toggleFullscreen()" class="text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition" title="Toggle Fullscreen">
@@ -1395,8 +1395,30 @@
                 return;
             }
             if (data.type === 'movie-select') {
-                addChatSystemMessage(`Host is playing "${data.title}" — load your own copy to follow along.`);
-                if (isPartyHost) broadcastToGuests(data, fromConn.peer);
+                // The host is NOT sending the movie file. The guest must already
+                // have the same local file loaded. Match by exact filename first,
+                // then by clean title as a friendly fallback.
+                if (!isPartyHost) {
+                    const guestIndex = movies.findIndex(m =>
+                        (data.name && m.name === data.name) ||
+                        (!data.name && m.cleanName === data.title) ||
+                        (data.title && m.cleanName === data.title)
+                    );
+
+                    if (guestIndex >= 0) {
+                        partyRoomScreen.classList.add('hidden');
+                        partyRoomScreen.classList.remove('flex');
+                        setChatPanelMode('floating');
+                        openPlayer(guestIndex);
+                        addChatSystemMessage(`Host is playing "${data.title}". Your local copy was opened automatically.`);
+                    } else {
+                        addChatSystemMessage(`Host is playing "${data.title}" — load the same movie file into this tab to watch.`);
+                        showNotification(`Could not find "${data.title}" in your loaded movies. Load the same local file as the host.`, 'error');
+                    }
+                } else {
+                    addChatSystemMessage(`Host is playing "${data.title}".`);
+                    broadcastToGuests(data, fromConn.peer);
+                }
                 return;
             }
             if (data.type === 'reaction') {
@@ -1482,7 +1504,7 @@
         const partyRoomScreen = document.getElementById('partyRoomScreen');
         const partyRoomChatSlot = document.getElementById('partyRoomChatSlot');
 
-        const CHAT_PANEL_FLOATING_CLASS = 'hidden fixed bottom-24 left-6 z-40 w-80 max-w-[90vw] bg-netflixCard border border-zinc-700 rounded-lg shadow-2xl flex-col overflow-hidden';
+        const CHAT_PANEL_FLOATING_CLASS = 'hidden fixed bottom-24 left-6 z-[70] w-80 max-w-[90vw] bg-netflixCard border border-zinc-700 rounded-lg shadow-2xl flex-col overflow-hidden';
         const CHAT_PANEL_EMBEDDED_CLASS = 'flex flex-col w-full h-full bg-netflixCard border border-zinc-700 rounded-lg overflow-hidden';
 
         function setChatPanelMode(mode) {
@@ -1561,7 +1583,11 @@
         function selectPartyMovie(index) {
             const movie = movies[index];
             if (isPartyHost && movie) {
-                sendPartyData({ type: 'movie-select', title: movie.cleanName });
+                sendPartyData({
+                    type: 'movie-select',
+                    title: movie.cleanName,
+                    name: movie.name
+                });
             }
             partyRoomScreen.classList.add('hidden');
             partyRoomScreen.classList.remove('flex');
