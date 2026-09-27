@@ -166,7 +166,7 @@
                 <i class="fa-solid fa-clapperboard"></i> LocalMovieSync <span class="text-zinc-500 text-lg font-bold normal-case tracking-normal ml-1">(LMS)</span>
             </h1>
             <span id="loadBadge" class="hidden text-xs bg-zinc-800 text-zinc-300 px-2.5 py-1 rounded-full font-medium ml-3">0 movies</span>
-            <span id="partyStatusBadge" class="hidden text-xs bg-netflixRed/20 text-netflixRed border border-netflixRed/40 px-2.5 py-1 rounded-full font-medium ml-2 items-center gap-1.5">
+            <span id="partyStatusBadge" onclick="enterPartyRoom()" title="Back to Party Room" class="hidden cursor-pointer text-xs bg-netflixRed/20 text-netflixRed border border-netflixRed/40 px-2.5 py-1 rounded-full font-medium ml-2 items-center gap-1.5">
                 <span class="w-1.5 h-1.5 rounded-full bg-netflixRed animate-pulse"></span><span id="partyStatusText"></span>
             </span>
         </div>
@@ -315,6 +315,34 @@
     <!-- Floating reactions rise up from here, over whatever's on screen -->
     <div id="reactionLayer" class="fixed inset-0 z-[55] pointer-events-none overflow-hidden"></div>
 
+    <!-- Party Room: what you land on right after starting/joining a party -
+         pick a movie from your library on the left, chat lives permanently
+         on the right instead of floating over everything. -->
+    <div id="partyRoomScreen" class="hidden fixed inset-0 z-[45] bg-netflixDark flex-col">
+        <div class="flex items-center justify-between px-4 md:px-6 py-4 border-b border-zinc-800 bg-netflixDark/95 backdrop-blur-md flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <button onclick="leavePartyRoomToLibrary()" title="Browse your full library" class="text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition">
+                    <i class="fa-solid fa-arrow-left text-lg"></i>
+                </button>
+                <div>
+                    <h2 class="text-lg md:text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-users text-netflixRed"></i> Watch Party</h2>
+                    <p class="text-xs text-zinc-500"><span id="partyRoomCode"></span> · <span id="partyRoomMemberCount">1</span> connected</p>
+                </div>
+            </div>
+            <button onclick="openPartyManageModal()" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-md text-xs font-semibold transition flex items-center gap-2">
+                <i class="fa-solid fa-gear"></i> Manage
+            </button>
+        </div>
+
+        <div class="flex-1 flex flex-col md:flex-row gap-4 p-4 md:p-6 overflow-hidden">
+            <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+                <h3 class="text-sm font-semibold text-zinc-400 uppercase tracking-wide mb-3 flex-shrink-0">Pick something to watch together</h3>
+                <div id="partyMovieGrid" class="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 content-start pb-4"></div>
+            </div>
+            <div id="partyRoomChatSlot" class="w-full md:w-96 flex-shrink-0 flex flex-col overflow-hidden" style="max-height:100%;"></div>
+        </div>
+    </div>
+
     <div id="playerModal" class="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl hidden flex-col justify-center items-center">
         <!-- Top Title & Subtitle Toolbar -->
         <div class="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-gradient-to-b from-black/90 to-transparent z-20 transition opacity-90 hover:opacity-100" id="playerTopBar">
@@ -355,6 +383,13 @@
             <video id="videoPlayer" class="max-w-full max-h-full object-contain" crossorigin="anonymous" playsinline>
                 Your browser does not support the video tag.
             </video>
+            <!-- Shown while the file is loading, hidden as soon as it's ready or errors out -->
+            <div id="playerLoadingIndicator" class="hidden absolute inset-0 flex-col items-center justify-center gap-3 text-zinc-400 bg-black/40 z-10 pointer-events-none">
+                <i class="fa-solid fa-circle-notch fa-spin text-4xl text-netflixRed"></i>
+                <p class="text-sm">Loading video…</p>
+            </div>
+            <!-- Shown when the browser genuinely can't play the file (bad codec, corrupt file, etc) -->
+            <div id="playerErrorBanner" class="hidden absolute inset-0 flex-col items-center justify-center gap-3 text-center text-zinc-300 bg-black/80 z-10 px-8"></div>
             <!-- Center Play/Pause Indicator Animation -->
             <div id="centerPlayIndicator" class="absolute pointer-events-none opacity-0 transition duration-300 text-white bg-black/60 p-6 rounded-full text-4xl shadow-2xl">
                 <i class="fa-solid fa-play" id="centerPlayIcon"></i>
@@ -446,6 +481,7 @@
 
         let currentObjectURL = null;     // tracks the active blob: URL so we can revoke it (memory-leak fix)
         let embeddedSubtitleTracks = {}; // mkv track number -> native TextTrack, for the current movie
+        let playerLoadWatchdog = null;   // catches the "loads forever, never errors, never plays" case
 
         // Drag & Drop handlers
         window.addEventListener('dragover', (e) => e.preventDefault());
@@ -690,6 +726,24 @@
             currentObjectURL = URL.createObjectURL(movie.file);
             videoPlayer.src = currentObjectURL;
 
+            // Reset loading/error UI for the new attempt
+            const loadingIndicator = document.getElementById('playerLoadingIndicator');
+            const errorBanner = document.getElementById('playerErrorBanner');
+            errorBanner.classList.add('hidden');
+            errorBanner.classList.remove('flex');
+            loadingIndicator.classList.remove('hidden');
+            loadingIndicator.classList.add('flex');
+            clearTimeout(playerLoadWatchdog);
+            playerLoadWatchdog = setTimeout(() => {
+                if (videoPlayer.readyState === 0) {
+                    loadingIndicator.classList.add('hidden');
+                    loadingIndicator.classList.remove('flex');
+                    errorBanner.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-3xl text-netflixRed mb-1"></i><p class="font-semibold">Still not loading</p><p class="text-sm text-zinc-400">This usually means your browser can't decode this file's codec. Try converting it to MP4 (H.264/AAC), or play it in VLC instead.</p>`;
+                    errorBanner.classList.remove('hidden');
+                    errorBanner.classList.add('flex');
+                }
+            }, 15000);
+
             // Reset subtitle & audio-track menus for the new movie
             subtitlesMenu.innerHTML = '<option value="off">Subtitles: Off</option>';
             audioTrackMenu.innerHTML = '';
@@ -703,6 +757,10 @@
             showControls();
 
             videoPlayer.onloadedmetadata = () => {
+                clearTimeout(playerLoadWatchdog);
+                document.getElementById('playerLoadingIndicator').classList.add('hidden');
+                document.getElementById('playerLoadingIndicator').classList.remove('flex');
+
                 // Scan for inbuilt/embedded text tracks the browser itself parsed out
                 // (this works for MP4/WebM files muxed with a real WebVTT/tx3g text
                 // track - it will NOT find anything for MKV, see note below).
@@ -724,8 +782,16 @@
                 if (movie.currentTime > 5 && movie.currentTime < videoPlayer.duration - 5) {
                     videoPlayer.currentTime = movie.currentTime;
                 }
-                videoPlayer.play().catch(err => console.log("Autoplay restriction prevented auto-start:", err));
-                updatePlayState(true);
+                // Bug fix: the play icon used to flip to "pause" immediately, even if
+                // play() actually failed (e.g. autoplay blocked) - so a video that
+                // silently didn't start still looked like it was playing.
+                videoPlayer.play().then(() => {
+                    updatePlayState(true);
+                }).catch(err => {
+                    console.log("Autoplay restriction prevented auto-start:", err);
+                    updatePlayState(false);
+                    showNotification('Your browser blocked autoplay - press play to start.');
+                });
             };
 
             // Browsers never expose subtitles/audio muxed INSIDE an .mkv container
@@ -743,6 +809,7 @@
         }
 
         function closePlayer() {
+            clearTimeout(playerLoadWatchdog);
             if (currentMovieIndex !== null) {
                 const movie = movies[currentMovieIndex];
                 watchHistory[movie.name] = {
@@ -766,6 +833,12 @@
 
             if (screen.orientation && typeof screen.orientation.unlock === 'function') {
                 screen.orientation.unlock();
+            }
+
+            // If a watch party is still running, land back in the Party Room
+            // (movie picker + chat) instead of the bare library.
+            if (partyCode) {
+                enterPartyRoom();
             }
         }
 
@@ -801,6 +874,34 @@
         });
         videoPlayer.addEventListener('play', scheduleAutoHide);
         videoPlayer.addEventListener('pause', showControls);
+
+        // This listener never existed before - a codec the browser can't decode
+        // (common with some MKV/AVI files) used to fail completely silently:
+        // black screen, paused-looking controls, no clue why. Now it says so.
+        videoPlayer.addEventListener('error', () => {
+            clearTimeout(playerLoadWatchdog);
+            const loadingIndicator = document.getElementById('playerLoadingIndicator');
+            loadingIndicator.classList.add('hidden');
+            loadingIndicator.classList.remove('flex');
+
+            const err = videoPlayer.error;
+            let reason = "This file could not be played.";
+            if (err) {
+                if (err.code === err.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+                    reason = "Your browser can't decode this file's codec (common with some MKV/AVI files). Try converting it to MP4 (H.264/AAC), or play it in VLC instead.";
+                } else if (err.code === err.MEDIA_ERR_DECODE) {
+                    reason = "The file appears to be corrupted, or uses a codec your browser can't decode.";
+                } else if (err.code === err.MEDIA_ERR_NETWORK) {
+                    reason = "The file couldn't be read - try reselecting it.";
+                }
+            }
+            const errorBanner = document.getElementById('playerErrorBanner');
+            errorBanner.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-3xl text-netflixRed mb-1"></i><p class="font-semibold">Can't play this file</p><p class="text-sm text-zinc-400">${reason}</p>`;
+            errorBanner.classList.remove('hidden');
+            errorBanner.classList.add('flex');
+            showNotification(reason, 'error');
+            updatePlayState(false);
+        });
 
         // Multi audio-track selector - only shown when the file actually has more
         // than one audio track and the browser supports HTMLMediaElement.audioTracks
@@ -1142,6 +1243,10 @@
         }
 
         function openPartyModal() {
+            if (partyCode) { enterPartyRoom(); return; } // already in a party - go straight to the room
+            openPartyManageModal();
+        }
+        function openPartyManageModal() {
             if (window.__peerJsLoadFailed) {
                 showNotification('Watch Party needs internet on first load and could not start.', 'error');
                 return;
@@ -1184,6 +1289,7 @@
                 peer.on('connection', (conn) => setupHostConnection(conn));
                 peer.on('disconnected', () => showNotification('Watch party connection dropped.', 'error'));
                 showPartyActivePanel();
+                enterPartyRoom();
                 showNotification('Watch party started — share the link with others.', 'success');
             } catch (err) {
                 console.error(err);
@@ -1221,6 +1327,7 @@
                     wireConnection(conn);
                     conn.send({ type: 'hello', name: partyName });
                     showPartyActivePanel();
+                    enterPartyRoom();
                     showNotification('Joined the watch party!', 'success');
                 });
                 conn.on('error', (err) => {
@@ -1287,6 +1394,11 @@
                 if (isPartyHost) broadcastToGuests(data, fromConn.peer);
                 return;
             }
+            if (data.type === 'movie-select') {
+                addChatSystemMessage(`Host is playing "${data.title}" — load your own copy to follow along.`);
+                if (isPartyHost) broadcastToGuests(data, fromConn.peer);
+                return;
+            }
             if (data.type === 'reaction') {
                 spawnFloatingReaction(data.emoji);
                 if (isPartyHost) broadcastToGuests(data, fromConn.peer);
@@ -1335,10 +1447,12 @@
         function sendPartyData(data) {
             if (isPartyHost) {
                 broadcastToGuests(data);
-                if (data.type === 'chat') addChatMessage(data.name, data.text, data.system);
             } else if (hostConnection) {
                 try { hostConnection.send(data); } catch (e) {}
             }
+            // Show it on the sender's own screen immediately - previously this only
+            // happened for the host, so a guest never saw their own messages.
+            if (data.type === 'chat') addChatMessage(data.name, data.text, data.system);
         }
 
         function showPartyActivePanel() {
@@ -1360,6 +1474,99 @@
             const count = isPartyHost ? guestConnections.size + 1 : 2; // a guest only knows "host + me"
             document.getElementById('partyMemberCount').textContent = count;
             document.getElementById('partyChatCount').textContent = isPartyHost ? `(${count})` : '';
+            const roomCount = document.getElementById('partyRoomMemberCount');
+            if (roomCount) roomCount.textContent = count;
+        }
+
+        // ---- Party Room: movie picker + permanently-docked chat ----
+        const partyRoomScreen = document.getElementById('partyRoomScreen');
+        const partyRoomChatSlot = document.getElementById('partyRoomChatSlot');
+
+        const CHAT_PANEL_FLOATING_CLASS = 'hidden fixed bottom-24 left-6 z-40 w-80 max-w-[90vw] bg-netflixCard border border-zinc-700 rounded-lg shadow-2xl flex-col overflow-hidden';
+        const CHAT_PANEL_EMBEDDED_CLASS = 'flex flex-col w-full h-full bg-netflixCard border border-zinc-700 rounded-lg overflow-hidden';
+
+        function setChatPanelMode(mode) {
+            if (mode === 'embedded') {
+                partyChatPanel.className = CHAT_PANEL_EMBEDDED_CLASS;
+                partyChatPanel.style.height = '';
+                partyChatToggle.classList.add('hidden');
+                playerPartyChatBtn.classList.add('hidden');
+                chatUnread = 0;
+                document.getElementById('partyChatBadge').classList.add('hidden');
+            } else {
+                partyChatPanel.className = CHAT_PANEL_FLOATING_CLASS;
+                partyChatPanel.style.height = '420px';
+                document.body.appendChild(partyChatPanel);
+                if (partyCode) {
+                    partyChatToggle.classList.remove('hidden');
+                    playerPartyChatBtn.classList.remove('hidden');
+                }
+            }
+        }
+
+        function enterPartyRoom() {
+            if (!partyCode) return;
+            closePartyModal();
+            document.getElementById('partyRoomCode').textContent = partyCode;
+            setChatPanelMode('embedded');
+            partyRoomChatSlot.appendChild(partyChatPanel);
+            renderPartyMovieGrid();
+            updateMemberCount();
+            partyRoomScreen.classList.remove('hidden');
+            partyRoomScreen.classList.add('flex');
+        }
+
+        function leavePartyRoomToLibrary() {
+            partyRoomScreen.classList.add('hidden');
+            partyRoomScreen.classList.remove('flex');
+            setChatPanelMode('floating');
+        }
+
+        function renderPartyMovieGrid() {
+            const grid = document.getElementById('partyMovieGrid');
+            grid.innerHTML = '';
+            if (movies.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full py-16 text-center text-zinc-500">
+                        <i class="fa-solid fa-folder-open text-5xl mb-3 text-zinc-700"></i>
+                        <p class="text-base mb-4">No movies loaded in this tab yet.</p>
+                        <button onclick="leavePartyRoomToLibrary(); folderInput.click();" class="bg-netflixRed hover:bg-red-700 px-4 py-2 rounded-md text-sm font-semibold transition">
+                            <i class="fa-solid fa-folder-open"></i> Load Movie Folder
+                        </button>
+                    </div>`;
+                return;
+            }
+            movies.forEach((movie, index) => {
+                const card = document.createElement('div');
+                card.className = 'group relative bg-netflixCard rounded-lg overflow-hidden shadow-md hover:shadow-xl transition duration-200 transform hover:-translate-y-1 cursor-pointer';
+                card.onclick = () => selectPartyMovie(index);
+                const thumbStyle = movie.thumbnailUrl
+                    ? `background-image:url('${movie.thumbnailUrl}');background-size:cover;background-position:center;`
+                    : '';
+                card.innerHTML = `
+                    <div class="relative w-full h-28 md:h-36 bg-zinc-900 flex items-center justify-center overflow-hidden" style="${thumbStyle}">
+                        ${!movie.thumbnailUrl ? `<i class="fa-solid fa-clapperboard text-3xl text-zinc-700"></i>` : ''}
+                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/40">
+                            <div class="w-9 h-9 bg-netflixRed text-white rounded-full flex items-center justify-center"><i class="fa-solid fa-play ml-0.5 text-xs"></i></div>
+                        </div>
+                    </div>
+                    <div class="p-2.5">
+                        <p class="text-xs font-medium text-white line-clamp-2 leading-snug" title="${movie.cleanName}">${movie.cleanName}</p>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function selectPartyMovie(index) {
+            const movie = movies[index];
+            if (isPartyHost && movie) {
+                sendPartyData({ type: 'movie-select', title: movie.cleanName });
+            }
+            partyRoomScreen.classList.add('hidden');
+            partyRoomScreen.classList.remove('flex');
+            setChatPanelMode('floating');
+            openPlayer(index);
         }
 
         function copyPartyLink() {
@@ -1393,10 +1600,12 @@
             guestConnections.clear();
             partyStatusBadge.classList.add('hidden');
             partyStatusBadge.classList.remove('flex');
+            partyRoomScreen.classList.add('hidden');
+            partyRoomScreen.classList.remove('flex');
+            setChatPanelMode('floating');
             partyChatToggle.classList.add('hidden');
-            partyChatPanel.classList.add('hidden');
-            partyChatPanel.classList.remove('flex');
             playerPartyChatBtn.classList.add('hidden');
+            document.getElementById('partyChatMessages').innerHTML = '';
             closePartyModal();
             showPartyPane('partyIdle');
         }
