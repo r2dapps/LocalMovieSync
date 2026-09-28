@@ -2,98 +2,160 @@
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LocalMovieSync (LMS) - Local Movie Browser, VLC Player & Watch Party</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>LocalMovieSync (LMS) - Private Cinema & Watch Party</title>
+    
+    <!-- Google Fonts: Outfit & JetBrains Mono for ytsync cinema typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Pure-JS Matroska (.mkv) subtitle demuxer - lets us pull embedded SRT/ASS subtitle
-         tracks out of MKV files entirely client-side, no ffmpeg/server needed.
-         If this fails to load (e.g. no internet on first run), embedded-subtitle
-         extraction is simply skipped - external .srt/.vtt upload still works. -->
+    
+    <!-- Pure-JS Matroska (.mkv) subtitle demuxer -->
     <script src="https://cdn.jsdelivr.net/npm/matroska-subtitles@3.x/dist/matroska-subtitles.min.js" defer onerror="window.__mkvSubsLoadFailed = true"></script>
-    <!-- Watch Party: PeerJS gives us WebRTC peer-to-peer connections in the
-         browser. Its free public "broker" server only ever introduces two
-         browsers to each other (signaling) - the actual chat/sync data flows
-         directly between browsers, never through any server, and no video is
-         ever uploaded anywhere. Requires internet on first load. -->
+    
+    <!-- Watch Party: PeerJS for zero-upload P2P browser streaming & sync -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js" defer onerror="window.__peerJsLoadFailed = true"></script>
+    
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
+                    fontFamily: {
+                        sans: ['Outfit', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
                     colors: {
-                        netflixRed: '#E50914',
-                        netflixDark: '#141414',
-                        netflixCard: '#1f1f1f',
-                        netflixHover: '#2a2a2a',
-                        vlcOrange: '#FF6600'
+                        bgMain: '#0a0c14',
+                        bgCard: '#121624',
+                        bgCardAlt: '#181d30',
+                        netflixRed: '#ef4444',
+                        netflixDark: '#0a0c14',
+                        netflixCard: '#121624',
+                        netflixHover: '#181d30',
+                        vlcOrange: '#FF6600',
+                        cinemaGlow: 'rgba(239, 68, 68, 0.25)'
                     }
                 }
             }
         }
     </script>
     <style>
+        :root {
+            --bg-main: #0a0c14;
+            --bg-card: #121624;
+            --bg-card-alt: #181d30;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-focus: rgba(239, 68, 68, 0.5);
+            --accent-red: #ef4444;
+            --accent-red-hover: #dc2626;
+            --accent-glow: rgba(239, 68, 68, 0.25);
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+        }
+
         body {
-            background-color: #141414;
+            background-color: var(--bg-main);
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(239, 68, 68, 0.08) 0%, transparent 60%),
+                radial-gradient(circle at 85% 15%, rgba(99, 102, 241, 0.04) 0%, transparent 40%),
+                radial-gradient(circle at 10% 85%, rgba(239, 68, 68, 0.04) 0%, transparent 45%);
             color: #ffffff;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             overflow-x: hidden;
             touch-action: manipulation;
+            min-height: 100vh;
         }
-        /* Custom scrollbars */
+
+        /* Sleek Modern Scrollbars matching ytsync */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
         }
         ::-webkit-scrollbar-track {
-            background: #141414;
+            background: transparent;
         }
         ::-webkit-scrollbar-thumb {
-            background: #333;
-            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 9999px;
+            border: 2px solid transparent;
+            background-clip: padding-box;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #555;
+            background: rgba(239, 68, 68, 0.6);
+            border: 2px solid transparent;
+            background-clip: padding-box;
         }
-        /* Fix: dropdown options (including JS-added subtitle/embedded-track options)
-           were inheriting no background, so on OS/browser combos that render native
-           <option> lists with a light theme, white text sat on a white background. */
+
+        /* Glassmorphism primitives */
+        .glass-panel {
+            background: rgba(18, 22, 36, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--border-color);
+        }
+        .glass-header {
+            background: rgba(10, 12, 20, 0.92);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .glass-modal {
+            background: rgba(14, 18, 30, 0.96);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .glass-card {
+            background: rgba(18, 22, 36, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+        }
+
         select option {
-            background-color: #1f1f1f;
+            background-color: #121624;
             color: #ffffff;
         }
-        /* Fix: range inputs had appearance-none with no replacement thumb/track
-           styling, so the "filled" portion of the progress/volume bar never
-           rendered. We style track+thumb ourselves and fill it via a JS-driven
-           background gradient (see updateRangeFill()). */
+
+        /* Glowing Range Slider styling */
         input[type="range"].av-range {
             -webkit-appearance: none;
             appearance: none;
             height: 6px;
             border-radius: 999px;
-            background: linear-gradient(to right, #E50914 0%, #E50914 0%, #4b5563 0%, #4b5563 100%);
+            background: linear-gradient(to right, #ef4444 0%, #ef4444 0%, #374151 0%, #374151 100%);
             outline: none;
             cursor: pointer;
+            transition: all 0.15s ease;
         }
         input[type="range"].av-range::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
-            width: 14px;
-            height: 14px;
+            width: 15px;
+            height: 15px;
             border-radius: 50%;
             background: #ffffff;
-            box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.9);
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.9);
             cursor: pointer;
             margin-top: 0;
+            transition: transform 0.15s ease;
+        }
+        input[type="range"].av-range::-webkit-slider-thumb:hover {
+            transform: scale(1.25);
+            box-shadow: 0 0 14px rgba(239, 68, 68, 1);
         }
         input[type="range"].av-range::-moz-range-thumb {
-            width: 14px;
-            height: 14px;
+            width: 15px;
+            height: 15px;
             border: none;
             border-radius: 50%;
             background: #ffffff;
-            box-shadow: 0 0 0 2px rgba(229, 9, 20, 0.9);
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.9);
             cursor: pointer;
         }
         input[type="range"].av-range::-moz-range-track {
@@ -104,49 +166,59 @@
         input[type="range"].av-range::-moz-range-progress {
             height: 6px;
             border-radius: 999px;
-            background: #E50914;
+            background: #ef4444;
         }
-        /* Auto-hide overlay controls during playback so they stop covering the
-           video/subtitles - see showControls()/scheduleAutoHide() in JS. */
+
+        /* Controls Auto-hide */
         #playerTopBar, #playerControls {
             transition: opacity 0.35s ease, transform 0.35s ease;
         }
         #playerTopBar.controls-hidden {
             opacity: 0 !important;
-            transform: translateY(-12px);
+            transform: translateY(-14px);
             pointer-events: none;
         }
         #playerControls.controls-hidden {
             opacity: 0 !important;
-            transform: translateY(12px);
+            transform: translateY(14px);
             pointer-events: none;
         }
         #videoContainer.cursor-hidden {
             cursor: none;
         }
-        /* Hide native video controls */
         video::-webkit-media-controls {
             display: none !important;
         }
-        .glow-hover:hover {
-            box-shadow: 0 10px 30px -5px rgba(229, 9, 20, 0.4);
+
+        .glow-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        /* Fade transitions */
+        .glow-hover:hover {
+            box-shadow: 0 12px 35px -5px rgba(239, 68, 68, 0.35);
+            border-color: rgba(239, 68, 68, 0.45);
+        }
+
         .fade-in {
-            animation: fadeIn 0.3s ease-in-out forwards;
+            animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         @keyframes fadeIn {
             from { opacity: 0; transform: scale(0.98); }
             to { opacity: 1; transform: scale(1); }
         }
-        /* Floating reactions: pure CSS rise-and-fade, nothing persisted anywhere. */
+
+        /* -------------------------------------------------------------
+           FLOATING REACTIONS (RESTORED KEYFRAMES & ZERO-FREEZE CLEANUP)
+           ------------------------------------------------------------- */
         .floating-reaction {
             position: absolute;
             bottom: 0;
-            font-size: 2rem;
+            font-size: 2.4rem;
             opacity: 0;
             animation: floatUp 2.6s ease-in forwards;
             will-change: transform, opacity;
+            pointer-events: none;
+            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.8));
+            z-index: 60;
         }
         @keyframes floatUp {
             0%   { opacity: 0; transform: translateY(0) scale(0.6) rotate(0deg); }
@@ -154,459 +226,995 @@
             80%  { opacity: 1; }
             100% { opacity: 0; transform: translateY(-70vh) scale(1) rotate(8deg); }
         }
-        .reaction-btn { transition: transform 0.15s ease; }
-        .reaction-btn:active { transform: scale(1.3); }
-    
-        /* Watch-party theatre / player layout */
-        #playerPartyChatDock .party-chat-inner { height:100%; }
-                #playerModal.party-docked #videoContainer { width:calc(100% - 340px); margin-right:340px; }
-        .party-remote .host-only-control { display:none !important; }
-        
-        /* Theatre UX / responsive layout */
-        #partyChatToggle button { box-shadow: 0 10px 28px rgba(0,0,0,.42); }
-        #partyChatToggle.player-chat-toggle { position:relative !important; top:auto !important; right:auto !important; z-index:40 !important; }
-        #partyChatToggle.player-chat-toggle button { min-height:42px; padding:.55rem .8rem; border-radius:.65rem; width:auto; height:auto; font-size:.78rem; display:flex; align-items:center; gap:.45rem; }
-        #partyChatToggle.theatre-chat-toggle { position:relative !important; top:auto !important; right:auto !important; z-index:40 !important; }
-        #partyChatToggle.theatre-chat-toggle button { min-height:38px; width:auto; height:38px; padding:.5rem .75rem; border-radius:.6rem; font-size:.75rem; display:flex; align-items:center; gap:.45rem; white-space:nowrap; }
-        #partyChatToggle.theatre-chat-toggle button .chat-label { display:inline; }
-        #partyMovieGrid { grid-template-columns:repeat(auto-fill,minmax(185px,1fr)); grid-auto-rows:max-content; align-content:start; }
-        .party-movie-card { min-width:0; min-height:0; }
-        .party-movie-poster { aspect-ratio:1/1; min-height:0 !important; height:auto !important; }
-        .party-movie-card .party-add-queue { min-height:38px; }
-        #partyRoomScreen { overflow:hidden; }
-        #partyRoomScreen .theatre-content-grid { min-height:0; }
-        #partyRoomScreen .theatre-content-grid > section, #partyRoomScreen .theatre-content-grid > aside { min-width:0; }
-        #partyAuditPanel { top:72px !important; right:12px !important; }
-        #partyChatPanel { overscroll-behavior:contain; }
-        #partyChatPanel input { min-width:0; }
-        #reactionBar { overflow-x:auto; overflow-y:hidden; justify-content:flex-start; scrollbar-width:none; -ms-overflow-style:none; }
-        #reactionBar::-webkit-scrollbar { display:none; }
-        #reactionBar .reaction-btn { flex:0 0 34px; width:34px; min-width:34px; height:34px; display:flex; align-items:center; justify-content:center; }
-        #playerModal.party-docked #playerPartyChatDock { width:min(340px,31vw); }
-        #playerModal.party-docked #playerTopBar { padding-right:calc(min(340px,31vw) + 1rem); }
-        #playerModal.party-docked #playerControls { right:min(340px,31vw); }
-        #playerModal.party-docked #videoContainer { width:calc(100% - min(340px,31vw)); margin-right:min(340px,31vw); }
-        .party-queue-item { transition:border-color .18s ease, transform .18s ease, background .18s ease; }
-        .party-queue-item:hover { border-color:#52525b; transform:translateY(-1px); }
-        .party-confirm-backdrop { backdrop-filter:blur(10px); }
-        .party-mode { overflow:hidden !important; }
-        html.party-mode { overflow:hidden !important; }
-        .theatre-header-actions { flex-shrink:0; }
-        .reaction-burst-particle { position:absolute; font-size:1.15rem; opacity:0; animation:reactionBurst .9s cubic-bezier(.2,.8,.2,1) forwards; will-change:transform,opacity; }
-        @keyframes reactionBurst { 0% { opacity:0; transform:translate(0,0) scale(.3) rotate(0deg); } 12% { opacity:1; } 100% { opacity:0; transform:translate(var(--dx),var(--dy)) scale(.95) rotate(var(--rot)); } }
-        .reaction-ring { position:absolute; width:20px; height:20px; border:2px solid rgba(255,255,255,.65); border-radius:999px; opacity:0; animation:reactionRing .65s ease-out forwards; }
-        @keyframes reactionRing { 0% { opacity:.8; transform:translate(-50%,-50%) scale(.3); } 100% { opacity:0; transform:translate(-50%,-50%) scale(5); } }
-        /* Party chat: keep a reopen button available. In the player it sits in
-           the top toolbar beside subtitles; on mobile the open chat occupies
-           the bottom while the video remains in the upper portion. */
-        #partyChatToggle.player-chat-toggle { position:relative !important; top:auto !important; right:auto !important; }
-        #partyChatToggle.player-chat-toggle button { height:38px; min-height:38px; padding:0 .7rem; }
-        #partyChatToggle.theatre-chat-toggle { position:relative !important; top:auto !important; right:auto !important; }
-        #partyChatToggle.theatre-chat-toggle button { height:38px; min-height:38px; }
-        #partyChatCodeDisplay { letter-spacing:.12em; }
-        #playerModal.party-docked #playerPartyChatDock { overflow:hidden; }
-        #playerModal.party-docked #playerPartyChatSlot { min-height:0; height:100%; }
-        @media (max-width:767px) {
-            #playerModal.party-docked #playerPartyChatDock {
-                top:auto !important; left:0 !important; right:0 !important; bottom:0 !important;
-                width:100% !important; height:min(42vh,300px) !important;
-                border-left:0; border-top:1px solid #27272a;
+        .reaction-burst-particle {
+            position: absolute;
+            font-size: 1.25rem;
+            opacity: 0;
+            animation: reactionBurst 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+            will-change: transform, opacity;
+            pointer-events: none;
+            z-index: 60;
+        }
+        @keyframes reactionBurst {
+            0%   { opacity: 0; transform: translate(0, 0) scale(0.3) rotate(0deg); }
+            12%  { opacity: 1; }
+            100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.95) rotate(var(--rot)); }
+        }
+        .reaction-ring {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            border: 2px solid rgba(255, 255, 255, 0.75);
+            border-radius: 999px;
+            opacity: 0;
+            animation: reactionRing 0.65s ease-out forwards;
+            pointer-events: none;
+            z-index: 60;
+        }
+        @keyframes reactionRing {
+            0%   { opacity: 0.8; transform: translate(-50%, -50%) scale(0.3); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(5); }
+        }
+
+        /* Horizontally scrollable reaction bar */
+        #reactionBar {
+            display: flex !important;
+            flex-direction: row !important;
+            flex-wrap: nowrap !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: thin !important;
+            scrollbar-color: rgba(239, 68, 68, 0.4) transparent !important;
+            gap: 0.35rem;
+            padding: 0.35rem 0.5rem;
+            width: 100%;
+            min-width: 0;
+        }
+        #reactionBar::-webkit-scrollbar {
+            height: 4px !important;
+            display: block !important;
+        }
+        #reactionBar::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 999px;
+        }
+        #reactionBar::-webkit-scrollbar-thumb {
+            background: rgba(239, 68, 68, 0.4);
+            border-radius: 999px;
+        }
+        #reactionBar::-webkit-scrollbar-thumb:hover {
+            background: rgba(239, 68, 68, 0.8);
+        }
+
+        /* Safeguard: Ensure no chat bubbles or panels float over the theater video card on mobile or desktop */
+        #playerModal.flex ~ #partyChatToggle,
+        #playerModal:not(.hidden) ~ #partyChatToggle,
+        #playerModal.flex ~ #partyChatPanel,
+        #playerModal:not(.hidden) ~ #partyChatPanel {
+            display: none !important;
+        }
+        #reactionBar .reaction-btn {
+            flex: 0 0 34px !important;
+            width: 34px !important;
+            min-width: 34px !important;
+            height: 34px !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            cursor: pointer;
+            border-radius: 0.5rem;
+            transition: transform 0.15s ease, background 0.15s ease;
+        }
+        #reactionBar .reaction-btn:hover {
+            transform: scale(1.25);
+            background: rgba(255, 255, 255, 0.1);
+        }
+        #reactionBar .reaction-btn:active {
+            transform: scale(1.4);
+        }
+
+        /* Modern bottom-to-top chat message stack (matching modern apps) */
+        #partyChatMessages {
+            display: flex !important;
+            flex-direction: column !important;
+            overflow-y: auto !important;
+            scroll-behavior: smooth;
+            gap: 0.5rem;
+            min-height: 0;
+            padding: 0.5rem 0.75rem;
+        }
+        #partyChatMessages > :first-child {
+            margin-top: auto !important;
+        }
+
+        /* Fullscreen live chat marquee subtitle ticker (left-to-right across lower third of video) */
+        .fullscreen-ticker-track {
+            position: absolute;
+            bottom: 30px;
+            white-space: nowrap;
+            font-weight: 700;
+            color: white;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95), 0 0 16px rgba(0, 0, 0, 0.85);
+            z-index: 38;
+            pointer-events: none;
+            animation: scrollFullscreenChatLeftToRight 9.5s linear forwards;
+        }
+        @keyframes scrollFullscreenChatLeftToRight {
+            0%   { transform: translateX(100vw); opacity: 0; }
+            5%   { opacity: 1; }
+            92%  { opacity: 1; }
+            100% { transform: translateX(-100%); opacity: 0; }
+        }
+
+        /* -------------------------------------------------------------
+           THEATER MODE LAYOUT (Desktop Cinema Grid + Chat/Playlist Dock)
+           ------------------------------------------------------------- */
+        #playerModal {
+            display: flex;
+            flex-direction: column;
+            background: #0a0c14;
+        }
+        #playerModal.hidden {
+            display: none !important;
+        }
+
+        /* When Dock is Open (Desktop 901px+) */
+        @media (min-width: 901px) {
+            #playerModal.party-docked #playerTheaterGrid {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+                gap: 1rem;
+                height: 100%;
+                min-height: 0;
+                align-items: stretch;
+            }
+            #playerModal.party-docked #playerStage {
+                height: 100%;
+                min-height: 0;
+                min-width: 0;
+                justify-content: center;
+                display: flex;
+                flex-direction: column;
             }
             #playerModal.party-docked #videoContainer {
-                width:100% !important; height:calc(100% - min(42vh,300px)) !important; margin-right:0 !important;
+                max-height: calc(100% - 5.5rem);
+                width: 100%;
+                height: auto;
+                aspect-ratio: 16 / 9;
+                margin: auto;
             }
-            #playerModal.party-docked #playerControls {
-                right:0 !important; bottom:min(42vh,300px) !important;
+            #playerModal.party-docked #playerPartyChatDock {
+                display: flex !important;
+                height: 100%;
+                min-height: 0;
             }
-            #playerModal.party-docked #playerTopBar { padding-right:.75rem !important; }
-            #playerModal.party-docked #playerTopBar > div:last-child {
-                gap:.3rem; overflow-x:auto; scrollbar-width:none; max-width:62vw;
-            }
-            #playerModal.party-docked #playerTopBar > div:last-child::-webkit-scrollbar { display:none; }
-            #playerModal.party-docked #playerChatToggleSlot { display:flex; flex-shrink:0; }
-            #playerModal.party-docked #playerChatToggleSlot #partyChatToggle.player-chat-toggle button {
-                width:38px; padding:0; justify-content:center;
-            }
-            #playerModal.party-docked #playerChatToggleSlot .chat-label { display:none; }
-            #partyChatCodeDisplay { max-width:68px; overflow:hidden; text-overflow:ellipsis; }
         }
 
-        @media (max-width:1279px) {
-            #partyRoomScreen .theatre-content-grid { grid-template-columns:minmax(0,1fr) 280px; }
-            #partyRoomChatSlot { display:none; }
-        }
-        @media (max-width:900px) {
-            #partyRoomScreen .theatre-content-grid { display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden; padding:12px; }
-            #partyRoomScreen .theatre-content-grid > section { flex:0 0 auto; min-height:0; height:min(58vh,620px); }
-            #partyRoomScreen .theatre-content-grid > section #partyMovieGrid { overflow-y:auto; }
-            #partyRoomScreen .theatre-content-grid > aside { flex:0 0 auto; min-height:280px; max-height:46vh; }
-            #partyRoomScreen .theatre-content-grid > aside:last-of-type { display:none; }
-            #partyRoomScreen { overflow:hidden; }
-            #partyRoomScreen > div:first-child { flex-wrap:nowrap; }
-            .theatre-header-actions { gap:4px; }
-            .theatre-header-actions .theatre-action { padding:.5rem .6rem; }
-            #partyAuditPanel { top:68px !important; right:8px !important; width:min(390px,calc(100vw - 16px)); max-height:60vh; }
-        }
-        @media (max-width:640px) {
-            #partyRoomScreen > div:first-child { padding:.65rem .7rem; }
-            #partyRoomScreen > div:first-child > div:first-child { min-width:0; gap:.5rem; }
-            #partyRoomScreen > div:first-child h2 { font-size:.9rem; }
-            #partyRoomScreen > div:first-child p { font-size:.65rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:42vw; }
-            #partyRoomScreen > div:first-child .theatre-header-actions { margin-left:auto; }
-            .theatre-header-actions .theatre-action { width:38px; height:38px; padding:0; justify-content:center; }
-            #partyChatToggle.theatre-chat-toggle button { height:38px; min-height:38px; padding:0 .6rem; }
-            #partyChatToggle.theatre-chat-toggle button .chat-label { display:none; }
-            #partyMovieGrid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem; }
-            .party-movie-card .party-movie-poster { aspect-ratio:1/1; }
-            .party-movie-card .p-3 { padding:.65rem; }
-            .party-movie-card .text-sm { font-size:.75rem; }
-            .party-movie-card .party-add-queue { min-height:36px; padding:.45rem .4rem; font-size:.68rem; }
-            #partyAuditPanel { top:64px !important; }
-            #partyChatPanel { top:74px !important; left:8px !important; right:8px !important; width:auto !important; height:min(62vh,460px) !important; }
-        }
-        @media (min-width:1280px) {
-            #partyRoomScreen .theatre-content-grid { grid-template-columns:minmax(0,1fr) 300px 320px; }
+        /* Mobile & Tablet stacked theater layout (<901px) */
+        @media (max-width: 900px) {
+            #playerModal.party-docked #playerTheaterGrid {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+                height: 100%;
+                min-height: 0;
+            }
+            #playerModal.party-docked #videoContainer {
+                max-height: 32vh;
+                aspect-ratio: 16 / 9;
+            }
+            #playerModal.party-docked #playerPartyChatDock {
+                display: flex !important;
+                flex: 1 1 0;
+                min-height: 0;
+            }
         }
 
-        .party-countdown-pulse { animation: partyPulse 1s ease-in-out infinite; }
-        @media (max-width: 767px) {
-            #partyRoomScreen .theatre-content-grid { overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; }
-            #partyRoomScreen .theatre-content-grid > section { flex:0 0 auto; min-height:70vh; }
-            #partyRoomScreen .theatre-content-grid > aside { flex:0 0 auto; min-height:360px; }
-            #partyRoomScreen .theatre-content-grid > aside:last-of-type { min-height:420px; }
-            #partyRoomScreen > div:first-child { flex-wrap:wrap; }
-            #partyRoomScreen > div:first-child > div:last-child { width:100%; justify-content:flex-end; }
-            #partyChatToggle.theatre-chat-toggle { top:auto !important; right:auto !important; }
-            #partyChatPanel { top:122px; right:12px; left:12px; width:auto; height:min(62vh,480px) !important; }
-            #playerPartyChatDock { top:auto; left:0; right:0; bottom:0; width:100% !important; height:min(42vh,300px); border-left:0; border-top:1px solid #27272a; }
-            #playerModal.party-docked #playerControls { right:0; bottom:min(42vh,300px); }
-            #playerModal.party-docked #videoContainer { width:100%; height:calc(100% - min(42vh,300px)); margin-right:0; }
+        /* When Chat is Hidden or Solo Viewing */
+        #playerModal:not(.party-docked) #playerTheaterGrid {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            max-width: 1560px;
+            margin: 0 auto;
+            width: 100%;
         }
-        @keyframes partyPulse { 50% { transform:scale(1.04); opacity:.82; } }
-</style>
+        #playerModal:not(.party-docked) #playerStage {
+            height: 100%;
+            min-height: 0;
+            min-width: 0;
+            justify-content: center;
+            display: flex;
+            flex-direction: column;
+        }
+        #playerModal:not(.party-docked) #videoContainer {
+            max-height: calc(100% - 5.5rem);
+            width: 100%;
+            height: auto;
+            aspect-ratio: 16 / 9;
+            margin: auto;
+        }
+
+        /* Real Fullscreen Viewport Mode */
+        #playerModal:fullscreen,
+        html.theater-fs #playerModal {
+            padding: 0 !important;
+        }
+        #playerModal:fullscreen #playerTopBar,
+        html.theater-fs #playerTopBar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 45;
+            background: linear-gradient(to bottom, rgba(10, 12, 20, 0.95), transparent);
+            border-bottom: none;
+        }
+        #playerModal:fullscreen #playerTheaterBody,
+        html.theater-fs #playerTheaterBody {
+            padding: 0;
+        }
+        #playerModal:fullscreen #playerStage,
+        html.theater-fs #playerStage {
+            gap: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        #playerModal:fullscreen #videoContainer,
+        html.theater-fs #videoContainer {
+            max-height: none !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            border-radius: 0 !important;
+            border: none !important;
+            box-shadow: none !important;
+        }
+        #playerModal:fullscreen #playerControls,
+        html.theater-fs #playerControls {
+            position: absolute;
+            bottom: 14px;
+            left: 14px;
+            right: 14px;
+            max-width: 1100px;
+            margin: 0 auto;
+            z-index: 45;
+        }
+        #playerModal:fullscreen #playerPartyChatDock,
+        html.theater-fs #playerPartyChatDock {
+            display: none !important;
+        }
+
+        .party-remote .host-only-control { display: none !important; }
+
+        /* Watch Party room styling */
+        #partyMovieGrid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); grid-auto-rows: max-content; align-content: start; }
+        .party-movie-poster { aspect-ratio: 16 / 10; min-height: 0 !important; }
+        .party-queue-item { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .party-queue-item:hover { border-color: rgba(239, 68, 68, 0.4); transform: translateY(-2px); }
+        .party-countdown-pulse { animation: partyCountdownScale 1s ease-in-out infinite; }
+        @keyframes partyCountdownScale { 50% { transform: scale(1.08); filter: drop-shadow(0 0 40px rgba(239,68,68,1)); } }
+
+        /* Custom confirmed backdrop */
+        .party-confirm-backdrop { backdrop-filter: blur(16px); }
+        .party-mode { overflow: hidden !important; }
+        html.party-mode { overflow: hidden !important; }
+
+        /* Clean Player Chat Toggle Button beside Subtitles */
+        #partyChatToggle.player-chat-toggle {
+            position: relative !important;
+            top: auto !important;
+            right: auto !important;
+            z-index: 40 !important;
+            display: inline-flex !important;
+        }
+        #partyChatToggle.player-chat-toggle button {
+            height: 30px !important;
+            min-height: 30px !important;
+            padding: 0 0.65rem !important;
+            border-radius: 0.75rem !important;
+            font-size: 0.75rem !important;
+            display: flex !important;
+            align-items: center !important;
+            gap: 0.35rem !important;
+            background: rgba(255, 255, 255, 0.08) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            color: #f1f5f9 !important;
+            box-shadow: none !important;
+            transition: all 0.2s ease;
+        }
+        #partyChatToggle.player-chat-toggle button:hover {
+            background: rgba(239, 68, 68, 0.25) !important;
+            border-color: rgba(239, 68, 68, 0.5) !important;
+            color: #ffffff !important;
+        }
+    </style>
 </head>
-<body class="min-h-screen flex flex-col bg-netflixDark text-white selection:bg-netflixRed selection:text-white">
+<body class="min-h-screen flex flex-col bg-[#0a0c14] text-white selection:bg-red-600 selection:text-white">
 
-    <header class="sticky top-0 z-40 bg-netflixDark/95 backdrop-blur-md border-b border-zinc-800 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+    <!-- Top Navigation Glass Header -->
+    <header class="sticky top-0 z-40 glass-header px-4 sm:px-6 py-3 flex flex-col md:flex-row items-center justify-between gap-3 shadow-lg">
         <div class="flex items-center justify-between w-full md:w-auto">
-            <h1 class="text-3xl font-black tracking-tighter text-netflixRed uppercase cursor-pointer flex items-center gap-2">
-                <i class="fa-solid fa-clapperboard"></i> LocalMovieSync <span class="text-zinc-500 text-lg font-bold normal-case tracking-normal ml-1">(LMS)</span>
-            </h1>
-            <span id="loadBadge" class="hidden text-xs bg-zinc-800 text-zinc-300 px-2.5 py-1 rounded-full font-medium ml-3">0 movies</span>
-            <span id="partyStatusBadge" onclick="enterPartyRoom()" title="Back to Party Room" class="hidden cursor-pointer text-xs bg-netflixRed/20 text-netflixRed border border-netflixRed/40 px-2.5 py-1 rounded-full font-medium ml-2 items-center gap-1.5">
-                <span class="w-1.5 h-1.5 rounded-full bg-netflixRed animate-pulse"></span><span id="partyStatusText"></span>
-            </span>
+            <div class="flex items-center gap-3 cursor-pointer group" onclick="if(partyCode) enterPartyRoom(); else window.scrollTo({top:0, behavior:'smooth'})">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-rose-700 flex items-center justify-center shadow-lg shadow-red-600/30 group-hover:scale-105 transition-transform duration-300 border border-red-400/30">
+                    <i class="fa-solid fa-clapperboard text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-1.5 leading-none">
+                        <span class="text-white">LocalMovie</span><span class="text-red-500">Sync</span>
+                    </h1>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-[9px] uppercase tracking-widest text-red-400 font-bold px-1.5 py-0.5 rounded bg-red-600/10 border border-red-500/20">Cinema Theater</span>
+                        <span class="text-[10px] text-gray-400 font-medium">P2P Watch Party</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <span id="loadBadge" class="hidden text-xs bg-white/[0.06] text-gray-300 border border-white/[0.08] px-3 py-1 rounded-full font-medium ml-2 shadow-inner">0 movies</span>
+                <span id="partyStatusBadge" onclick="enterPartyRoom()" title="Return to Party Room" class="hidden cursor-pointer text-xs bg-red-600/15 text-red-400 border border-red-500/40 px-3 py-1 rounded-full font-bold ml-1 items-center gap-2 hover:bg-red-600/25 transition shadow-lg shadow-red-600/20">
+                    <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                    <span id="partyStatusText">THEATER ROOM</span>
+                </span>
+            </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-            <label class="cursor-pointer bg-netflixRed hover:bg-red-700 text-white px-4 py-2 rounded-md font-semibold text-sm transition shadow-lg flex items-center gap-2">
-                <i class="fa-solid fa-folder-open"></i> Load Movie Folder
+        <div class="flex items-center space-x-2 sm:space-x-3 w-full md:w-auto justify-end">
+            <!-- Load Local Media Files -->
+            <label class="cursor-pointer bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] hover:border-white/[0.2] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2 shadow-sm active:scale-95 text-gray-200 hover:text-white" title="Choose a folder of movies">
+                <i class="fa-solid fa-folder-open text-amber-400"></i>
+                <span>Folder</span>
                 <input type="file" id="folderInput" webkitdirectory directory multiple class="hidden">
             </label>
-            <label class="cursor-pointer bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-4 py-2 rounded-md font-semibold text-sm transition flex items-center gap-2">
-                <i class="fa-solid fa-file-arrow-up"></i> Add Files
+            <label class="cursor-pointer bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] hover:border-white/[0.2] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center gap-2 shadow-sm active:scale-95 text-gray-200 hover:text-white" title="Choose individual video files">
+                <i class="fa-solid fa-file-video text-blue-400"></i>
+                <span>Files</span>
                 <input type="file" id="filesInput" multiple accept="video/*" class="hidden">
             </label>
-            <button onclick="openPartyModal()" id="partyBtn" title="Watch Party" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-4 py-2 rounded-md font-semibold text-sm transition flex items-center gap-2">
-                <i class="fa-solid fa-users"></i> Watch Party
-            </button>
-            <button onclick="clearHistory()" title="Clear Watch History" class="bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white p-2 rounded-md border border-zinc-800 transition">
-                <i class="fa-solid fa-clock-rotate-left"></i>
+            <!-- Start/Join Party -->
+            <button onclick="openPartyModal()" id="partyBtn" title="Host or Join Watch Party" class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white px-4 py-2 rounded-xl font-bold text-xs sm:text-sm transition flex items-center gap-2 shadow-lg shadow-red-600/30 active:scale-95 cursor-pointer">
+                <i class="fa-solid fa-users"></i>
+                <span>Watch Party</span>
             </button>
         </div>
     </header>
 
-    <section id="heroBanner" class="relative px-6 py-12 md:py-20 bg-gradient-to-b from-zinc-900 to-netflixDark border-b border-zinc-800/60">
-        <div class="max-w-4xl mx-auto text-center space-y-4">
-            <h2 class="text-3xl md:text-5xl font-bold tracking-tight">Your Personal Cinematic Universe</h2>
-            <p class="text-zinc-400 text-sm md:text-base max-w-xl mx-auto">
-                Select your local movie folder or drag & drop video files. Enjoy automatic canvas video thumbnails, intelligent filtering, embedded subtitle extraction, and VLC-grade playback.
+    <!-- Hero / Library Controls Banner -->
+    <section id="heroBanner" class="relative px-4 sm:px-6 py-8 md:py-14 max-w-7xl mx-auto w-full flex flex-col gap-6">
+        <div class="space-y-2 text-center md:text-left">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-600/10 border border-red-500/30 text-red-400 text-xs font-bold uppercase tracking-wider">
+                <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping"></span>
+                <span>Zero Upload • 100% Client-Side Sync</span>
+            </div>
+            <h2 class="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white leading-tight">
+                Private Cinema. <span class="bg-gradient-to-r from-red-500 via-rose-500 to-amber-500 bg-clip-text text-transparent">Real-Time Sync.</span>
+            </h2>
+            <p class="text-gray-400 text-sm sm:text-base max-w-2xl font-normal leading-relaxed">
+                Stream movies directly between browsers with sub-second synchronization. Subtitles extracted on-the-fly from MKV, with zero server uploads.
             </p>
-            <div class="pt-2 flex flex-wrap justify-center gap-6 text-xs text-zinc-500">
-                <span><i class="fa-solid fa-shield-halved text-green-500"></i> 100% Client-Side & Private</span>
-                <span><i class="fa-solid fa-bolt text-amber-500"></i> Canvas Thumbnail Generator</span>
-                <span><i class="fa-solid fa-closed-captioning text-netflixRed"></i> Auto-Subtitle Extraction</span>
+        </div>
+
+        <!-- Filter, Sort & Search Toolbar -->
+        <div class="glass-panel p-2.5 sm:p-3 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-3 shadow-xl">
+            <div class="relative w-full md:w-96 flex items-center">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-gray-400 text-sm"></i>
+                <input type="text" id="searchInput" placeholder="Search films by title..." class="w-full bg-black/40 border border-white/[0.08] focus:border-red-500/60 rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-gray-500 outline-none transition shadow-inner">
+            </div>
+
+            <div class="flex items-center gap-2.5 w-full md:w-auto justify-end">
+                <div class="flex items-center gap-2 bg-black/40 border border-white/[0.08] rounded-xl px-3 py-1.5 shadow-inner">
+                    <span class="text-xs text-gray-400 font-medium">Format:</span>
+                    <select id="formatFilter" class="bg-transparent border-none outline-none text-xs sm:text-sm font-semibold text-white cursor-pointer">
+                        <option value="all">All Formats</option>
+                        <option value="mp4">MP4</option>
+                        <option value="mkv">MKV</option>
+                        <option value="webm">WEBM</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-2 bg-black/40 border border-white/[0.08] rounded-xl px-3 py-1.5 shadow-inner">
+                    <span class="text-xs text-gray-400 font-medium">Sort:</span>
+                    <select id="sortBy" class="bg-transparent border-none outline-none text-xs sm:text-sm font-semibold text-white cursor-pointer">
+                        <option value="name">Name (A-Z)</option>
+                        <option value="date">Recently Added</option>
+                        <option value="size">File Size</option>
+                        <option value="progress">Recently Played</option>
+                    </select>
+                </div>
             </div>
         </div>
     </section>
 
-    <nav class="relative z-30 bg-netflixDark/90 backdrop-blur-md px-6 py-3 border-b border-zinc-800 flex flex-wrap items-center justify-between gap-4">
-        <div class="flex items-center space-x-2 flex-1 min-w-[240px] max-w-md bg-zinc-900/80 border border-zinc-700 rounded-md px-3 py-1.5 focus-within:border-netflixRed transition">
-            <i class="fa-solid fa-magnifying-glass text-zinc-400 text-sm"></i>
-            <input type="text" id="searchInput" placeholder="Search movies by title..." class="bg-transparent border-none outline-none text-sm w-full text-white placeholder-zinc-500">
-        </div>
-
-        <div class="flex flex-wrap items-center gap-3 text-sm">
-            <div class="flex items-center space-x-1.5 bg-zinc-900 border border-zinc-700 rounded-md px-3 py-1.5">
-                <span class="text-zinc-400 text-xs uppercase font-semibold">Format:</span>
-                <select id="formatFilter" class="bg-transparent border-none outline-none text-white cursor-pointer text-sm">
-                    <option value="all" class="bg-zinc-900">All Formats</option>
-                    <option value="mp4" class="bg-zinc-900">MP4</option>
-                    <option value="mkv" class="bg-zinc-900">MKV</option>
-                    <option value="webm" class="bg-zinc-900">WebM</option>
-                    <option value="mov" class="bg-zinc-900">MOV</option>
-                    <option value="avi" class="bg-zinc-900">AVI</option>
-                </select>
-            </div>
-
-            <div class="flex items-center space-x-1.5 bg-zinc-900 border border-zinc-700 rounded-md px-3 py-1.5">
-                <span class="text-zinc-400 text-xs uppercase font-semibold">Sort By:</span>
-                <select id="sortBy" class="bg-transparent border-none outline-none text-white cursor-pointer text-sm">
-                    <option value="name-asc" class="bg-zinc-900">Name (A - Z)</option>
-                    <option value="name-desc" class="bg-zinc-900">Name (Z - A)</option>
-                    <option value="duration-desc" class="bg-zinc-900">Duration (Longest first)</option>
-                    <option value="duration-asc" class="bg-zinc-900">Duration (Shortest first)</option>
-                    <option value="size-desc" class="bg-zinc-900">Size (Largest first)</option>
-                    <option value="size-asc" class="bg-zinc-900">Size (Smallest first)</option>
-                    <option value="date-desc" class="bg-zinc-900">Date Added (Newest)</option>
-                </select>
-            </div>
-        </div>
-    </nav>
-
-    <main class="flex-1 px-6 py-8">
-        <div id="movieGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-            <div class="col-span-full py-24 text-center text-zinc-500">
-                <i class="fa-solid fa-film text-6xl mb-4 text-zinc-700"></i>
-                <p class="text-lg">No movies loaded yet. Click <strong>"Load Movie Folder"</strong> above to begin your cinematic session.</p>
+    <!-- Main Movie Cards Grid -->
+    <main class="flex-1 px-4 sm:px-6 max-w-7xl mx-auto w-full pb-16">
+        <div id="movieGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5 sm:gap-5">
+            <!-- Initial Empty State -->
+            <div class="col-span-full py-20 text-center glass-panel rounded-3xl p-8 border border-white/[0.08]">
+                <div class="w-16 h-16 rounded-full bg-red-600/10 border border-red-500/30 flex items-center justify-center mx-auto mb-4 shadow-inner">
+                    <i class="fa-solid fa-film text-3xl text-red-500 animate-pulse"></i>
+                </div>
+                <h3 class="text-lg sm:text-xl font-bold text-white mb-1">Your Cinema Catalog is Empty</h3>
+                <p class="text-xs sm:text-sm text-gray-400 max-w-md mx-auto mb-6">Choose a folder containing your movies (MP4, MKV, WebM) or individual files to build your local theater.</p>
+                <div class="flex flex-wrap items-center justify-center gap-3">
+                    <button onclick="folderInput.click()" class="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-red-600/30 transition cursor-pointer active:scale-95 flex items-center gap-2">
+                        <i class="fa-solid fa-folder-open"></i> Load Movie Folder
+                    </button>
+                    <button onclick="filesInput.click()" class="bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.1] text-gray-200 hover:text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition cursor-pointer active:scale-95 flex items-center gap-2">
+                        <i class="fa-solid fa-file-video"></i> Select Files
+                    </button>
+                </div>
             </div>
         </div>
     </main>
 
-    <!-- Watch Party: create/join modal -->
-    <div id="partyModal" class="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-        <div class="bg-netflixCard border border-zinc-700 rounded-lg w-full max-w-md p-6 space-y-5">
-            <div class="flex items-center justify-between">
-                <h3 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-users text-netflixRed"></i> Watch Party</h3>
-                <button onclick="closePartyModal()" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
-            </div>
-
-            <div id="partyIdle" class="space-y-4">
-                <p class="text-sm text-zinc-400">Start a private theatre from this browser. Your display name is remembered on this device. Only the host chooses what actually plays; guests can request titles and chat while the host streams the movie.</p>
-                <input id="partyNameInput" type="text" maxlength="20" placeholder="Your theatre name" class="w-full bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-sm outline-none focus:border-netflixRed">
-                <button onclick="createParty()" class="w-full bg-netflixRed hover:bg-red-700 py-2.5 rounded-md font-semibold text-sm transition">
-                    <i class="fa-solid fa-plus"></i> Start a Watch Party
-                </button>
-                <div class="flex items-center gap-2 text-xs text-zinc-600"><div class="flex-1 h-px bg-zinc-800"></div>or<div class="flex-1 h-px bg-zinc-800"></div></div>
-                <div class="flex gap-2">
-                    <input id="joinCodeInput" type="text" maxlength="8" placeholder="Enter party code" class="flex-1 bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-sm outline-none focus:border-netflixRed uppercase">
-                    <button onclick="joinParty()" class="bg-zinc-800 hover:bg-zinc-700 px-4 rounded-md font-semibold text-sm transition">Join</button>
-                </div>
-            </div>
-
-            <div id="partyConnecting" class="hidden text-center py-6 text-zinc-400 text-sm">
-                <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-3 text-netflixRed"></i>
-                <p id="partyConnectingText">Connecting…</p>
-            </div>
-
-            <div id="partyActive" class="hidden space-y-4">
-                <div class="bg-zinc-900 border border-zinc-700 rounded-md p-3 flex items-center justify-between gap-3">
-                    <div>
-                        <p class="text-xs text-zinc-500 uppercase font-semibold">Party Code</p>
-                        <p id="partyCodeDisplay" class="text-lg font-mono font-bold tracking-widest"></p>
+    <!-- Watch Party: Create / Join Modal -->
+    <div id="partyModal" class="fixed inset-0 z-[60] bg-black/80 backdrop-blur-md hidden items-center justify-center p-4">
+        <div class="glass-modal w-full max-w-md p-6 sm:p-7 rounded-3xl border border-red-500/30 shadow-2xl space-y-5 animate-fade">
+            <div class="flex items-center justify-between border-b border-white/[0.08] pb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-red-600/20 text-red-500 border border-red-500/40 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-users"></i>
                     </div>
-                    <button onclick="copyPartyLink()" class="bg-netflixRed hover:bg-red-700 px-3 py-2 rounded-md text-xs font-semibold transition whitespace-nowrap"><i class="fa-solid fa-link"></i> Copy Link</button>
+                    <div>
+                        <h3 class="text-lg sm:text-xl font-bold text-white leading-tight">Watch Party</h3>
+                        <p class="text-[11px] text-gray-400">Zero-upload browser theater sync</p>
+                    </div>
                 </div>
-                <p id="partyRoleNote" class="text-xs text-zinc-400"></p>
-                <p class="text-sm"><span class="text-zinc-400">Connected:</span> <span id="partyMemberCount" class="font-semibold">1</span></p>
-                <button onclick="leaveParty()" class="w-full bg-zinc-800 hover:bg-zinc-700 text-red-400 py-2 rounded-md font-semibold text-sm transition">
-                    <i class="fa-solid fa-right-from-bracket"></i> <span id="leavePartyLabel">End Watch Party</span>
+                <button onclick="closePartyModal()" class="w-8 h-8 rounded-full bg-white/[0.06] hover:bg-white/[0.12] text-gray-400 hover:text-white flex items-center justify-center transition cursor-pointer">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+
+            <!-- Idle Pane: Create or Join -->
+            <div id="partyIdle" class="space-y-4">
+                <p class="text-xs text-gray-300 leading-relaxed">
+                    Host a private screening. Guests connect directly via WebRTC peer-to-peer. The host streams the movie locally; guests request titles and chat live.
+                </p>
+                <div>
+                    <label class="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1.5">Your Screen Name</label>
+                    <input id="partyNameInput" type="text" maxlength="20" placeholder="e.g. CinemaMaster" class="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-red-500 transition shadow-inner">
+                </div>
+                <button onclick="createParty()" class="w-full bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 py-3 rounded-xl font-bold text-sm text-white transition shadow-lg shadow-red-600/30 active:scale-95 cursor-pointer flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-sparkles"></i> Start Watch Party
+                </button>
+                <div class="flex items-center gap-3 text-xs text-gray-500">
+                    <div class="flex-1 h-px bg-white/[0.08]"></div><span>or join existing</span><div class="flex-1 h-px bg-white/[0.08]"></div>
+                </div>
+                <div class="flex gap-2">
+                    <input id="joinCodeInput" type="text" maxlength="8" placeholder="Party code" class="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none focus:border-red-500 uppercase tracking-widest font-mono transition shadow-inner">
+                    <button onclick="joinParty()" class="bg-white/[0.08] hover:bg-white/[0.16] border border-white/[0.1] px-5 rounded-xl font-bold text-sm text-white transition cursor-pointer active:scale-95">
+                        Join
+                    </button>
+                </div>
+            </div>
+
+            <!-- Connecting Pane -->
+            <div id="partyConnecting" class="hidden text-center py-8 text-gray-300 text-sm space-y-3">
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl text-red-500"></i>
+                <p id="partyConnectingText" class="font-semibold">Establishing peer connection…</p>
+            </div>
+
+            <!-- Active Party Pane -->
+            <div id="partyActive" class="hidden space-y-4">
+                <div class="glass-panel p-4 rounded-2xl flex items-center justify-between gap-3 border border-red-500/30">
+                    <div>
+                        <p class="text-[10px] text-gray-400 uppercase font-bold tracking-widest">Party Room Code</p>
+                        <p id="partyCodeDisplay" class="text-xl font-mono font-black text-white tracking-widest mt-0.5"></p>
+                    </div>
+                    <button onclick="copyPartyLink()" class="bg-red-600 hover:bg-red-500 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95">
+                        <i class="fa-solid fa-link text-xs"></i> Copy Link
+                    </button>
+                </div>
+                <p id="partyRoleNote" class="text-xs text-gray-300 font-medium"></p>
+                <div class="flex items-center justify-between text-xs text-gray-300 px-1">
+                    <span>Connected Audience:</span>
+                    <span id="partyMemberCount" class="font-bold text-white font-mono bg-white/[0.08] px-2.5 py-0.5 rounded-full">1</span>
+                </div>
+                <button onclick="leaveParty()" class="w-full bg-white/[0.06] hover:bg-red-600/20 text-red-400 hover:text-red-300 border border-white/[0.08] hover:border-red-500/40 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span id="leavePartyLabel">End Watch Party</span>
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Watch Party: floating chat toggle + panel (visible once connected) -->
+    <!-- Floating Chat Toggle Pill Button (Used in Library/Theatre lobby) -->
     <div id="partyChatToggle" class="hidden fixed top-[76px] right-5 z-[85]">
-        <button onclick="togglePartyChat()" class="relative bg-netflixRed hover:bg-red-700 rounded-lg shadow-2xl flex items-center justify-center transition">
-            <i class="fa-solid fa-comments"></i><span class="chat-label">Chat</span>
-            <span id="partyChatBadge" class="hidden absolute -top-1 -right-1 bg-white text-netflixRed text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">0</span>
+        <button onclick="togglePartyChat()" class="relative bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white p-2.5 sm:px-3.5 sm:py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 transition cursor-pointer active:scale-95 border border-red-400/30">
+            <i class="fa-solid fa-comments text-base"></i>
+            <span class="chat-label text-xs font-bold hidden sm:inline">Live Chat</span>
+            <span id="partyChatBadge" class="hidden absolute -top-1.5 -right-1.5 bg-white text-red-600 text-[10px] font-black rounded-full w-5 h-5 flex items-center justify-center shadow-lg border border-red-200">0</span>
         </button>
     </div>
 
-    <div id="partyChatPanel" class="hidden fixed top-[140px] right-5 z-[84] w-80 max-w-[calc(100vw-2rem)] bg-netflixCard border border-zinc-700 rounded-lg shadow-2xl flex-col overflow-hidden" style="height:min(520px,calc(100vh - 170px));">
-        <div class="bg-zinc-900 px-3 sm:px-4 py-3 flex items-center justify-between gap-2 border-b border-zinc-800">
-            <div class="min-w-0 flex items-center gap-2">
-                <span class="font-semibold text-sm flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-users text-netflixRed"></i> Party Chat <span id="partyChatCount" class="text-zinc-500 font-normal"></span></span>
-                <button onclick="copyPartyCode()" title="Copy party code" class="shrink-0 inline-flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-md px-2 py-1 text-[10px] sm:text-xs font-mono text-zinc-200 transition">
-                    <span id="partyChatCodeDisplay">------</span><i class="fa-regular fa-copy text-zinc-400"></i>
-                </button>
+    <!-- Floating Live Party Chat Panel (Used when floating) -->
+    <div id="partyChatPanel" class="hidden fixed top-[135px] right-5 z-[84] w-80 max-w-[calc(100vw-2rem)] glass-panel rounded-2xl shadow-2xl flex-col overflow-hidden border border-white/[0.12]" style="height: min(520px, calc(100vh - 165px));">
+        <div class="px-4 py-3 flex items-center justify-between border-b border-white/[0.08] bg-black/40">
+            <div class="flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="font-bold text-xs uppercase tracking-wider text-gray-200">Live Party Chat</span>
+                <span id="partyChatCount" class="text-[10px] font-mono text-gray-400"></span>
             </div>
-            <button onclick="togglePartyChat()" title="Close chat" class="shrink-0 text-zinc-400 hover:text-white p-1"><i class="fa-solid fa-xmark"></i></button>
+            <button onclick="togglePartyChat()" class="text-gray-400 hover:text-white p-1 transition cursor-pointer">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
         </div>
-        <div id="partyChatMessages" class="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm"></div>
-        <div class="px-2 pt-1 pb-2 border-t border-zinc-800 flex items-center justify-between gap-1" id="reactionBar">
-            <!-- Quick reactions: sent as tiny P2P messages, not stored anywhere -->
-        </div>
-        <div class="p-2 pt-0 flex gap-2">
-            <input id="partyChatInput" type="text" placeholder="Message..." maxlength="300" class="flex-1 bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-sm outline-none focus:border-netflixRed">
-            <button onclick="sendPartyChat()" class="bg-netflixRed hover:bg-red-700 w-10 rounded-md flex items-center justify-center transition"><i class="fa-solid fa-paper-plane text-sm"></i></button>
+
+        <div id="partyChatMessages" class="flex-1 overflow-y-auto px-3.5 py-2.5 space-y-2 text-xs sm:text-sm"></div>
+
+        <!-- Quick Reactions Bar (Horizontally scrollable with smooth touch) -->
+        <div class="border-t border-white/[0.08] bg-black/20" id="reactionBar"></div>
+
+        <!-- Input Bar -->
+        <div class="p-2.5 pt-1.5 flex gap-2 border-t border-white/[0.08] bg-black/40">
+            <input id="partyChatInput" type="text" placeholder="Message party..." maxlength="300" class="flex-1 bg-black/60 border border-white/[0.08] rounded-xl px-3 py-2 text-xs sm:text-sm text-white placeholder-gray-500 outline-none focus:border-red-500 transition shadow-inner">
+            <button onclick="sendPartyChat()" class="bg-red-600 hover:bg-red-500 text-white w-9 h-9 rounded-xl flex items-center justify-center transition shadow-md shadow-red-600/30 cursor-pointer active:scale-95 shrink-0">
+                <i class="fa-solid fa-paper-plane text-xs"></i>
+            </button>
         </div>
     </div>
 
-    <!-- Floating reactions rise up from here, over whatever's on screen -->
+    <!-- Floating Reactions Layer (Fixed full viewport, pointer-events none) -->
     <div id="reactionLayer" class="fixed inset-0 z-[55] pointer-events-none overflow-hidden"></div>
 
-    <!-- Party Room: the shared theatre lobby. Host controls playback; guests request titles. -->
-    <div id="partyRoomScreen" class="hidden fixed inset-0 z-[45] bg-[#0d0d0f] flex-col">
-        <div class="flex items-center justify-between px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-zinc-800 bg-black/60 backdrop-blur-xl flex-shrink-0">
+    <!-- The Theatre Room / Lobby Screen -->
+    <div id="partyRoomScreen" class="hidden fixed inset-0 z-[45] bg-[#0a0c14] flex-col overflow-hidden">
+        <div class="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-white/[0.08] glass-header flex-shrink-0">
             <div class="flex items-center gap-3 min-w-0">
-                <button onclick="requestLeaveTheatre()" title="Exit theatre" class="text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition"><i class="fa-solid fa-arrow-left text-lg"></i></button>
+                <button onclick="requestLeaveTheatre()" title="Exit theatre" class="w-9 h-9 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] text-gray-300 hover:text-white flex items-center justify-center transition active:scale-95 cursor-pointer">
+                    <i class="fa-solid fa-arrow-left text-sm"></i>
+                </button>
                 <div class="min-w-0">
-                    <h2 class="text-lg md:text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-clapperboard text-netflixRed"></i> The Theatre <span id="partyRolePill" class="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-zinc-800 text-zinc-400">Guest</span></h2>
-                    <p class="text-xs text-zinc-500"><span id="partyRoomCode"></span> · <span id="partyRoomMemberCount">1</span> watching · <span id="partyRoomProfileName"></span></p>
+                    <h2 class="text-base sm:text-lg font-bold flex items-center gap-2 leading-tight">
+                        <i class="fa-solid fa-clapperboard text-red-500"></i> The Theatre 
+                        <span id="partyRolePill" class="text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-600/20 text-red-300 border border-red-500/30 font-bold">Guest</span>
+                    </h2>
+                    <p class="text-[11px] text-gray-400 truncate mt-0.5">
+                        <span id="partyRoomCode" class="font-mono text-white font-bold"></span> • 
+                        <span id="partyRoomMemberCount" class="text-gray-300">1</span> watching • 
+                        <span id="partyRoomProfileName" class="text-gray-300 font-medium"></span>
+                    </p>
                 </div>
             </div>
+
             <div class="theatre-header-actions flex items-center gap-2 min-w-0">
                 <div id="partyChatHeaderSlot" class="flex items-center shrink-0"></div>
-                <button onclick="togglePartyAudit()" class="theatre-action bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-md text-xs font-semibold transition flex items-center gap-2"><i class="fa-solid fa-list-check"></i><span class="hidden sm:inline">Activity</span></button>
-                <button onclick="openPartyManageModal()" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-md text-xs font-semibold transition flex items-center gap-2"><i class="fa-solid fa-gear"></i><span class="hidden sm:inline">Party</span></button>
-                <button onclick="requestLeaveTheatre()" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-md text-xs font-semibold transition flex items-center gap-2"><i class="fa-solid fa-door-open"></i><span class="hidden sm:inline">Exit</span></button>
+                <button onclick="togglePartyAudit()" class="theatre-action bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] text-gray-200 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer">
+                    <i class="fa-solid fa-list-check text-xs"></i><span class="hidden sm:inline">Activity</span>
+                </button>
+                <button onclick="openPartyManageModal()" class="bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] text-gray-200 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer">
+                    <i class="fa-solid fa-gear text-xs"></i><span class="hidden sm:inline">Party</span>
+                </button>
+                <button onclick="requestLeaveTheatre()" class="bg-white/[0.06] hover:bg-red-600/20 text-red-400 hover:text-red-300 border border-white/[0.08] hover:border-red-500/40 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer">
+                    <i class="fa-solid fa-door-open text-xs"></i><span class="hidden sm:inline">Exit</span>
+                </button>
             </div>
         </div>
-        <div class="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_300px_320px] gap-3 p-3 sm:p-4 md:p-6 overflow-hidden theatre-content-grid">
-            <section class="min-w-0 min-h-0 flex flex-col">
-                <div class="flex items-end justify-between gap-3 mb-3 flex-shrink-0"><div><p class="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Your Library</p><h3 class="text-base font-semibold text-white">Choose a film</h3></div><span class="text-xs text-zinc-500">Files stay local</span></div>
-                <div id="partyMovieGrid" class="party-movie-grid flex-1 min-h-0 overflow-y-auto grid gap-4 content-start pb-4 pr-1"></div>
+
+        <div class="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_320px_340px] gap-3.5 p-3 sm:p-5 overflow-hidden theatre-content-grid">
+            <section class="min-w-0 min-h-0 flex flex-col glass-panel rounded-2xl p-4 border border-white/[0.08]">
+                <div class="flex items-end justify-between gap-3 mb-3 flex-shrink-0">
+                    <div>
+                        <p class="text-[9px] uppercase tracking-[0.25em] text-red-400 font-bold">Host Library</p>
+                        <h3 class="text-sm sm:text-base font-bold text-white">Choose a Film</h3>
+                    </div>
+                    <span class="text-[11px] text-gray-400 font-medium">Local file playback</span>
+                </div>
+                <div id="partyMovieGrid" class="party-movie-grid flex-1 min-h-0 overflow-y-auto grid gap-3 content-start pb-4 pr-1"></div>
             </section>
-            <aside class="min-h-0 bg-[#151518] border border-zinc-800 rounded-xl overflow-hidden flex flex-col">
-                <div class="px-4 py-3 border-b border-zinc-800"><p class="text-[10px] uppercase tracking-[0.25em] text-zinc-500">The Queue</p><h3 class="font-semibold">Requests & Up Next</h3></div>
+
+            <aside class="min-h-0 glass-panel border border-white/[0.08] rounded-2xl overflow-hidden flex flex-col">
+                <div class="px-4 py-3 border-b border-white/[0.08] bg-black/30">
+                    <p class="text-[9px] uppercase tracking-[0.25em] text-red-400 font-bold">The Queue</p>
+                    <h3 class="font-bold text-sm text-white">Requests & Up Next</h3>
+                </div>
                 <div id="partyQueueList" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
-                <div class="px-3 py-2 border-t border-zinc-800 text-[11px] text-zinc-500">Guests request. Host decides what plays.</div>
+                <div class="px-3.5 py-2.5 border-t border-white/[0.08] text-[11px] text-gray-400 bg-black/20">
+                    Guests request titles. Host decides what plays.
+                </div>
             </aside>
-            <aside id="partyRoomChatSlot" class="min-h-0 flex flex-col overflow-hidden xl:col-span-1"></aside>
+
+            <aside id="partyRoomChatSlot" class="min-h-0 flex flex-col overflow-hidden xl:col-span-1 rounded-2xl"></aside>
         </div>
-        <div id="partyAuditPanel" class="hidden absolute top-16 right-4 md:right-6 w-[min(390px,calc(100vw-2rem))] max-h-[55vh] z-20 bg-[#151518]/98 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden">
-            <div class="px-4 py-3 border-b border-zinc-800 flex items-center justify-between"><div><p class="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Quiet Log</p><h3 class="font-semibold">Party Activity</h3></div><button onclick="togglePartyAudit()" class="text-zinc-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
-            <div id="partyAuditList" class="p-3 max-h-[45vh] overflow-y-auto space-y-2 text-xs"></div>
+
+        <div id="partyAuditPanel" class="hidden absolute top-16 right-4 md:right-6 w-[min(390px,calc(100vw-2rem))] max-h-[55vh] z-20 glass-modal border border-white/[0.12] rounded-2xl shadow-2xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-white/[0.08] flex items-center justify-between bg-black/40">
+                <div>
+                    <p class="text-[9px] uppercase tracking-[0.25em] text-red-400 font-bold">Log</p>
+                    <h3 class="font-bold text-xs text-white">Party Activity History</h3>
+                </div>
+                <button onclick="togglePartyAudit()" class="text-gray-400 hover:text-white p-1"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="partyAuditList" class="p-3 max-h-[45vh] overflow-y-auto space-y-1.5 text-xs"></div>
         </div>
     </div>
 
-    <div id="playerModal" class="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl hidden flex-col justify-center items-center">
-        <div id="playerPartyChatDock" class="hidden absolute top-0 right-0 bottom-0 w-[340px] z-[35] bg-[#171717]/98 border-l border-zinc-800 shadow-2xl">
-            <div id="playerPartyChatSlot" class="h-full w-full"></div>
-        </div>
-        <div id="partyCountdownOverlay" class="hidden absolute inset-0 z-[90] pointer-events-none flex-col items-center justify-center bg-[#050505]">
-            <div class="text-center">
-                <div class="text-[11px] uppercase tracking-[0.35em] text-zinc-300 mb-3">Up next</div>
-                <div id="partyCountdownNumber" class="text-[7rem] md:text-[10rem] leading-none font-black text-white drop-shadow-2xl">4</div>
-                <div id="partyCountdownTitle" class="mt-2 text-lg md:text-2xl font-semibold text-white max-w-[70vw] truncate"></div>
-            </div>
-        </div>
-        <!-- Top Title & Subtitle Toolbar -->
-        <div class="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-gradient-to-b from-black/90 to-transparent z-20 transition opacity-90 hover:opacity-100" id="playerTopBar">
-            <div class="flex items-center space-x-3">
-                <button onclick="closePlayer()" class="text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition">
-                    <i class="fa-solid fa-arrow-left text-lg"></i>
+    <!-- =============================================================
+         THEATER / PLAYER MODAL (RESPONSIVE TOPBAR, PLAYLIST TAB & FIXES)
+         ============================================================= -->
+    <div id="playerModal" class="fixed inset-0 z-50 bg-[#0a0c14] hidden flex-col overflow-hidden select-none">
+        
+        <!-- Top Toolbar Bar (Responsive, clean theater feel with Chat button beside subtitles) -->
+        <div id="playerTopBar" class="glass-header z-30 px-2.5 sm:px-5 py-2 sm:py-2.5 flex justify-between items-center shrink-0 border-b border-white/[0.08] transition duration-300 gap-2">
+            <!-- Left: Back, Title, Role -->
+            <div class="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-shrink">
+                <button onclick="closePlayer()" class="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] text-gray-300 hover:text-white flex items-center justify-center transition active:scale-95 cursor-pointer shrink-0" title="Back / Exit Theater">
+                    <i class="fa-solid fa-arrow-left text-xs sm:text-sm"></i>
                 </button>
-                <h3 id="modalMovieTitle" class="text-base md:text-xl font-bold truncate max-w-xs md:max-w-xl">Movie Title</h3>
-            </div>
-            <div class="flex items-center space-x-2 md:space-x-3">
-                <div id="playerChatToggleSlot" class="flex items-center"></div>
-                <!-- Audio Track Selector (shown only when a file has multiple audio tracks) -->
-                <div id="audioTrackWrap" class="hidden items-center space-x-2 bg-zinc-900/90 border border-zinc-700/80 px-3 py-1.5 rounded-md">
-                    <i class="fa-solid fa-headphones text-netflixRed"></i>
-                    <select id="audioTrackMenu" class="bg-transparent text-xs text-white border-none cursor-pointer outline-none"></select>
+                <div class="min-w-0">
+                    <h3 id="modalMovieTitle" class="text-xs sm:text-sm md:text-base font-bold text-white truncate max-w-[100px] xs:max-w-[150px] sm:max-w-[240px] md:max-w-[340px] leading-tight">Movie Title</h3>
                 </div>
-                <!-- Subtitle Selector & External Loader -->
-                <div class="flex items-center space-x-2 bg-zinc-900/90 border border-zinc-700/80 px-3 py-1.5 rounded-md">
-                    <i class="fa-solid fa-closed-captioning text-netflixRed"></i>
-                    <select id="subtitlesMenu" class="bg-transparent text-xs text-white border-none cursor-pointer outline-none">
+                <span id="theaterRoleBadge" class="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-zinc-800 text-zinc-300 border border-zinc-700 shrink-0">🎬 Solo</span>
+            </div>
+
+            <!-- Right: Audio, Subtitles, Chat Toggle, Fullscreen -->
+            <div class="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+                <!-- Audio Track Selector Pill (Hidden if only 1 track) -->
+                <div id="audioTrackWrap" class="hidden items-center space-x-1.5 bg-black/50 border border-white/[0.1] px-2 sm:px-2.5 py-1 rounded-xl shrink-0">
+                    <i class="fa-solid fa-headphones text-red-500 text-[10px] sm:text-xs shrink-0"></i>
+                    <select id="audioTrackMenu" class="bg-transparent text-[11px] sm:text-xs text-white border-none cursor-pointer outline-none font-medium max-w-[70px] sm:max-w-[120px] truncate"></select>
+                </div>
+
+                <!-- Subtitle Selector Pill (Responsive max-width) -->
+                <div class="flex items-center space-x-1.5 bg-black/60 border border-white/[0.12] px-2 sm:px-2.5 py-1 rounded-xl shrink-0 min-w-0">
+                    <i class="fa-solid fa-closed-captioning text-red-500 text-[10px] sm:text-xs shrink-0"></i>
+                    <select id="subtitlesMenu" class="bg-transparent text-[11px] sm:text-xs text-white border-none cursor-pointer outline-none font-medium truncate" style="max-width: clamp(80px, 16vw, 165px);">
                         <option value="off">Subtitles: Off</option>
                     </select>
-                    <label class="cursor-pointer text-zinc-400 hover:text-white text-xs underline pl-1 border-l border-zinc-700" title="Upload External Subtitle (.srt / .vtt)">
+                    <label class="cursor-pointer text-gray-400 hover:text-white text-[10px] sm:text-xs underline pl-1 border-l border-white/[0.12] shrink-0" title="Upload External Subtitle (.srt / .vtt)">
                         + Add
                         <input type="file" id="subtitleInput" accept=".srt,.vtt" class="hidden">
                     </label>
                 </div>
-                <button onclick="toggleFullscreen()" class="text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition" title="Toggle Fullscreen">
-                    <i id="fullscreenIcon" class="fa-solid fa-expand text-lg"></i>
+
+                <!-- Chat Toggle Button beside Subtitles (kept clean theater feel) -->
+                <div id="playerChatToggleSlot" class="flex items-center shrink-0"></div>
+
+                <!-- Fullscreen Button -->
+                <button onclick="toggleFullscreen()" class="w-8.5 h-8.5 sm:w-9 sm:h-9 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] text-gray-300 hover:text-white flex items-center justify-center transition cursor-pointer active:scale-95 shrink-0" title="Toggle Fullscreen">
+                    <i id="fullscreenIcon" class="fa-solid fa-expand text-xs sm:text-sm"></i>
                 </button>
             </div>
         </div>
 
-        <!-- Video Container -->
-        <div class="relative w-full h-full flex items-center justify-center cursor-pointer" id="videoContainer">
-            <video id="videoPlayer" class="max-w-full max-h-full object-contain" crossorigin="anonymous" playsinline autoplay></video>
-            <!-- Shown while the file is loading, hidden as soon as it's ready or errors out -->
-            <div id="playerLoadingIndicator" class="hidden absolute inset-0 flex-col items-center justify-center gap-3 text-zinc-400 bg-black/40 z-10 pointer-events-none">
-                <i class="fa-solid fa-circle-notch fa-spin text-4xl text-netflixRed"></i>
-                <p class="text-sm">Loading video…</p>
-            </div>
-            <!-- Shown when the browser genuinely can't play the file (bad codec, corrupt file, etc) -->
-            <div id="playerErrorBanner" class="hidden absolute inset-0 flex-col items-center justify-center gap-3 text-center text-zinc-300 bg-black/80 z-10 px-8"></div>
-            <!-- Center Play/Pause Indicator Animation -->
-            <div id="centerPlayIndicator" class="absolute pointer-events-none opacity-0 transition duration-300 text-white bg-black/60 p-6 rounded-full text-4xl shadow-2xl">
-                <i class="fa-solid fa-play" id="centerPlayIcon"></i>
-            </div>
-        </div>
+        <!-- Theater Body Container -->
+        <div id="playerTheaterBody" class="flex-1 w-full min-h-0 flex flex-col p-2 sm:p-4 overflow-hidden relative">
+            <div id="playerTheaterGrid" class="w-full h-full min-h-0 flex flex-col transition-all duration-300">
+                
+                <!-- Cinema Stage: Video + Unified Controls -->
+                <div id="playerStage" class="flex flex-col flex-1 min-h-0 min-w-0 justify-center items-center gap-2 sm:gap-3 transition-all duration-300">
+                    
+                    <!-- Cinema Video Frame Wrapper (No native autoplay so countdown never overlaps playback) -->
+                    <div id="videoContainer" class="relative w-full aspect-video max-h-[calc(100vh-140px)] bg-black rounded-2xl overflow-hidden shadow-2xl border border-red-500/25 group flex items-center justify-center transition-all duration-300 cursor-pointer" style="box-shadow: 0 0 50px -10px rgba(239, 68, 68, 0.2);">
+                        <video id="videoPlayer" class="w-full h-full object-contain" crossorigin="anonymous" playsinline></video>
 
-        <!-- VLC Custom Bottom Controls -->
-        <div class="absolute bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-black via-black/90 to-transparent flex flex-col gap-2.5 z-20 transition opacity-95 hover:opacity-100" id="playerControls">
-            <!-- Scrubbing Progress Bar -->
-            <div class="flex items-center gap-3">
-                <span id="currentTimeDisplay" class="text-xs text-zinc-400 font-mono w-12 text-right">00:00</span>
-                <input type="range" id="progressBar" value="0" min="0" max="100" step="0.1" class="host-only-control av-range w-full h-2 rounded-lg cursor-pointer">
-                <span id="durationDisplay" class="text-xs text-zinc-400 font-mono w-12">00:00</span>
-            </div>
+                        <!-- Cinematic 5-Second Countdown Timer Overlay -->
+                        <div id="partyCountdownOverlay" class="hidden absolute inset-0 z-[90] flex-col items-center justify-center bg-[#0a0c14]/95 backdrop-blur-md space-y-2 pointer-events-none">
+                            <h2 class="text-xs sm:text-sm font-bold text-red-400 uppercase tracking-[0.25em]">Synchronized Screening in</h2>
+                            <span id="partyCountdownNumber" class="text-7xl sm:text-9xl font-black text-white font-mono animate-pulse drop-shadow-[0_0_35px_rgba(239,68,68,0.9)]">4</span>
+                            <div id="partyCountdownTitle" class="mt-2 text-base sm:text-xl font-bold text-white max-w-md text-center truncate font-sans px-4"></div>
+                        </div>
 
-            <div class="flex items-center justify-between pt-1">
-                <div class="flex items-center space-x-4 md:space-x-5">
-                    <button id="playPauseBtn" class="host-only-control text-white hover:text-netflixRed transition text-xl" title="Play/Pause">
-                        <i class="fa-solid fa-play" id="playPauseIcon"></i>
-                    </button>
-                    <button onclick="skipTime(-10)" class="host-only-control text-zinc-400 hover:text-white transition text-lg" title="Rewind 10s">
-                        <i class="fa-solid fa-rotate-left"></i>
-                    </button>
-                    <button onclick="skipTime(10)" class="host-only-control text-zinc-400 hover:text-white transition text-lg" title="Forward 10s">
-                        <i class="fa-solid fa-rotate-right"></i>
-                    </button>
-                    <div class="flex items-center space-x-2">
-                        <button id="muteBtn" class="text-white hover:text-netflixRed transition text-lg" title="Mute/Unmute">
-                            <i class="fa-solid fa-volume-high" id="volumeIcon"></i>
+                        <!-- Cinema Pause State Overlay (matching ytsync) -->
+                        <div id="pause-overlay" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-[#0a0c14]/85 backdrop-blur-md z-40 p-4 text-center select-none transition-all duration-300">
+                            <div class="glass-panel px-6 py-4 rounded-2xl border border-red-500/40 shadow-2xl flex flex-col items-center space-y-2 max-w-sm animate-fade">
+                                <div class="flex items-center gap-2 px-3 py-1 rounded-full bg-red-600/25 text-red-400 text-[10px] font-bold uppercase tracking-widest border border-red-500/40">
+                                    <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                                    <span>Theater Paused</span>
+                                </div>
+                                <p id="pause-funny-text" class="text-xs sm:text-sm font-bold text-gray-200">🍿 Hold up! Popcorn refill time...</p>
+                                <span class="text-[10px] text-gray-400 font-medium">Host paused playback • Grab your snacks!</span>
+                            </div>
+                        </div>
+
+                        <!-- Fullscreen Moving Live Chat Subtitle Ticker (Only in true Fullscreen) -->
+                        <div id="fullscreen-chat-ticker" class="absolute inset-x-0 bottom-6 h-12 overflow-hidden z-40 pointer-events-none"></div>
+
+                        <!-- Exit Fullscreen 'X' Button -->
+                        <button id="exitFullscreenBtn" class="hidden absolute top-4 right-4 bg-black/75 hover:bg-red-600 text-white p-2.5 rounded-full z-40 backdrop-blur-md transition cursor-pointer" title="Exit Fullscreen">
+                            <i class="fa-solid fa-xmark text-sm"></i>
                         </button>
-                        <input type="range" id="volumeBar" min="0" max="1" step="0.05" value="1" class="av-range w-16 md:w-24 h-1 rounded-lg cursor-pointer">
+
+                        <!-- Loading Indicator -->
+                        <div id="playerLoadingIndicator" class="hidden absolute inset-0 flex-col items-center justify-center gap-3 text-gray-300 bg-black/60 z-30 pointer-events-none backdrop-blur-sm">
+                            <i class="fa-solid fa-circle-notch fa-spin text-4xl text-red-500"></i>
+                            <p class="text-xs sm:text-sm font-semibold tracking-wide">Loading video file…</p>
+                        </div>
+
+                        <!-- Error Banner -->
+                        <div id="playerErrorBanner" class="hidden absolute inset-0 flex-col items-center justify-center gap-3 text-center text-gray-200 bg-black/85 z-30 px-6 backdrop-blur-md"></div>
+
+                        <!-- Center Play/Pause Ripple Indicator -->
+                        <div id="centerPlayIndicator" class="absolute pointer-events-none opacity-0 transition duration-300 text-white bg-black/65 p-6 rounded-full text-4xl shadow-2xl z-30 border border-white/20">
+                            <i class="fa-solid fa-play" id="centerPlayIcon"></i>
+                        </div>
+                    </div>
+
+                    <!-- Unified Player Controls Bar (Modeled directly after ytsync's unified controls) -->
+                    <div id="playerControls" class="w-full glass-panel rounded-2xl p-2 sm:p-2.5 shadow-xl flex flex-col space-y-1.5 shrink-0 border border-white/[0.08] transition-opacity duration-300">
+                        <!-- Seek Slider Container -->
+                        <div class="flex items-center gap-2 px-1">
+                            <!-- Seek Lock Toggle Button -->
+                            <button type="button" id="seekLockBtn" class="p-1 px-1.5 rounded-lg text-xs bg-black/50 hover:bg-black/70 text-gray-400 hover:text-white border border-white/[0.08] transition cursor-pointer shrink-0" title="Lock timeline seek bar (prevent mistouch)">
+                                🔓
+                            </button>
+                            <span id="currentTimeDisplay" class="text-[11px] font-mono text-gray-400 w-12 text-right">00:00</span>
+                            <input type="range" id="progressBar" value="0" min="0" max="100" step="0.1" class="host-only-control av-range w-full h-1.5 rounded-lg cursor-pointer">
+                            <span id="durationDisplay" class="text-[11px] font-mono text-gray-400 w-12">00:00</span>
+                        </div>
+
+                        <!-- Playback Controls Row -->
+                        <div class="flex items-center justify-between px-1 gap-2">
+                            <!-- Left: Host Playback Controls + Role Badge Icon -->
+                            <div class="flex items-center space-x-1.5 sm:space-x-2">
+                                <!-- Role Icon Indicator -->
+                                <span id="roleBadgeIcon" class="flex items-center justify-center w-7 h-7 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs sm:text-sm cursor-help shadow-sm" title="Host Controls">
+                                    👑
+                                </span>
+
+                                <!-- 10s Rewind -->
+                                <button onclick="skipTime(-10)" class="host-only-control p-1.5 sm:p-2 bg-black/40 hover:bg-white/[0.1] text-gray-300 hover:text-white rounded-xl border border-white/[0.08] transition cursor-pointer active:scale-95" title="Rewind 10 Seconds">
+                                    <svg class="w-3.5 h-3.5 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12.5 8.5C9.5 8.5 7 10.5 7 13.5s2.5 5 5.5 5 5.5-2.5 5.5-5.5M7 10L4 13l3 3"/><text x="12.5" y="15" font-size="7" font-weight="bold" fill="currentColor" text-anchor="middle" stroke="none">10</text></svg>
+                                </button>
+
+                                <!-- Play / Pause Button (Crimson Glow) -->
+                                <button id="playPauseBtn" class="host-only-control p-1.5 sm:px-3.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-xl shadow-lg shadow-red-600/30 transition cursor-pointer active:scale-95 flex items-center justify-center" title="Play / Pause">
+                                    <i class="fa-solid fa-play text-sm" id="playPauseIcon"></i>
+                                </button>
+
+                                <!-- 10s Forward -->
+                                <button onclick="skipTime(10)" class="host-only-control p-1.5 sm:p-2 bg-black/40 hover:bg-white/[0.1] text-gray-300 hover:text-white rounded-xl border border-white/[0.08] transition cursor-pointer active:scale-95" title="Forward 10 Seconds">
+                                    <svg class="w-3.5 h-3.5 fill-none stroke-current" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.5 8.5c3 0 5.5 2 5.5 5s-2.5 5-5.5 5-5.5-2.5-5.5-5.5M17 10l3 3-3 3"/><text x="11.5" y="15" font-size="7" font-weight="bold" fill="currentColor" text-anchor="middle" stroke="none">10</text></svg>
+                                </button>
+
+                                <!-- Speed Selector Pill -->
+                                <div class="host-only-control flex items-center space-x-1 bg-black/40 border border-white/[0.08] rounded-xl px-2.5 py-1 text-xs text-gray-300">
+                                    <span class="text-gray-400 font-medium">Speed:</span>
+                                    <select id="playbackSpeed" class="bg-transparent text-white border-none cursor-pointer outline-none text-xs font-semibold">
+                                        <option value="0.5">0.5x</option>
+                                        <option value="0.75">0.75x</option>
+                                        <option value="1" selected>1x</option>
+                                        <option value="1.25">1.25x</option>
+                                        <option value="1.5">1.5x</option>
+                                        <option value="2">2x</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Right: Volume & Fullscreen -->
+                            <div class="flex items-center space-x-2">
+                                <div class="flex items-center space-x-1.5 bg-black/40 border border-white/[0.08] rounded-xl px-2 py-1">
+                                    <button id="muteBtn" class="text-gray-300 hover:text-white transition text-xs p-1" title="Mute/Unmute">
+                                        <i class="fa-solid fa-volume-high" id="volumeIcon"></i>
+                                    </button>
+                                    <input type="range" id="volumeBar" min="0" max="1" step="0.05" value="1" class="av-range w-14 sm:w-20 h-1 rounded-lg cursor-pointer">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="flex items-center space-x-3 text-xs md:text-sm">
-                    <div class="host-only-control flex items-center space-x-1.5 bg-zinc-800/90 border border-zinc-700/80 rounded px-2.5 py-1">
-                        <span class="text-zinc-400">Speed:</span>
-                        <select id="playbackSpeed" class="bg-transparent text-white border-none cursor-pointer outline-none text-xs">
-                            <option value="0.5">0.5x</option>
-                            <option value="0.75">0.75x</option>
-                            <option value="1" selected>Normal</option>
-                            <option value="1.25">1.25x</option>
-                            <option value="1.5">1.5x</option>
-                            <option value="2">2x</option>
-                        </select>
+                <!-- Docked Live Party Chat & Playlist Panel (Inside Theater Layout with Tabs) -->
+                <div id="playerPartyChatDock" class="hidden min-h-0 overflow-hidden rounded-2xl glass-panel border border-white/[0.08] shadow-2xl flex-col">
+                    <!-- Tab Header: Live Chat vs Playlist / Queue -->
+                    <div class="px-3 py-2 border-b border-white/[0.08] bg-black/40 flex items-center justify-between shrink-0">
+                        <div class="flex items-center space-x-1 bg-black/60 p-1 rounded-xl border border-white/[0.08] text-xs">
+                            <button id="dock-tab-chat-btn" onclick="switchDockTab('chat')" class="px-3 py-1 rounded-lg font-bold transition text-white bg-red-600 flex items-center gap-1.5 cursor-pointer">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                <span>Chat</span>
+                                <span id="dockChatBadge" class="hidden text-[9px] bg-white text-red-600 font-black px-1.5 rounded-full">0</span>
+                            </button>
+                            <button id="dock-tab-queue-btn" onclick="switchDockTab('queue')" class="px-3 py-1 rounded-lg font-bold transition text-gray-400 hover:text-white flex items-center gap-1.5 cursor-pointer">
+                                <span>📋 Playlist</span>
+                                <span id="dockQueueCountBadge" class="text-[9px] bg-white/10 px-1.5 py-0.5 rounded-full font-mono text-gray-300">0</span>
+                            </button>
+                        </div>
+                        <button onclick="togglePartyChat()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/[0.06] transition cursor-pointer" title="Hide Dock">
+                            <i class="fa-solid fa-xmark text-sm"></i>
+                        </button>
+                    </div>
+
+                    <!-- Pane 1: Live Chat -->
+                    <div id="dock-pane-chat" class="flex-1 min-h-0 flex flex-col">
+                        <div id="playerPartyChatSlot" class="h-full w-full flex flex-col min-h-0"></div>
+                    </div>
+
+                    <!-- Pane 2: Playlist & Queue (Accessible directly while playing) -->
+                    <div id="dock-pane-queue" class="hidden flex-1 min-h-0 flex flex-col overflow-hidden p-3 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5">
+                                <i class="fa-solid fa-list-ul text-red-500"></i> Party Playlist
+                            </h4>
+                            <span id="theaterQueueCount" class="text-[10px] font-mono text-gray-400">0 films</span>
+                        </div>
+                        <!-- Scrollable list of queue items -->
+                        <div id="partyTheaterQueueList" class="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0"></div>
+                        <!-- Quick Add / Request Dropdown directly from Theater (Responsive flex layout) -->
+                        <div class="pt-2 border-t border-white/[0.08] flex gap-2 items-center w-full min-w-0 shrink-0">
+                            <div class="relative flex-1 min-w-0">
+                                <select id="quickQueueSelect" 
+                                    onfocus="populateQuickQueueSelect()" 
+                                    onchange="if(this.value!=='') addQuickSelectedMovieToQueue()"
+                                    class="w-full bg-zinc-900 border border-white/20 rounded-xl px-2.5 py-1.5 text-xs text-white outline-none focus:border-red-500 cursor-pointer truncate"
+                                    style="max-width: 100%;">
+                                    <option value="">+ Add film from library…</option>
+                                </select>
+                            </div>
+                            <button onclick="addQuickSelectedMovieToQueue()" class="bg-red-600 hover:bg-red-500 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition shadow-sm cursor-pointer shrink-0 active:scale-95">
+                                + Add
+                            </button>
+                        </div>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
 
-    <!-- App confirmation dialog: never use browser alert/confirm for theatre exits. -->
-    <div id="appConfirm" class="hidden fixed inset-0 z-[120] items-center justify-center p-4 party-confirm-backdrop bg-black/70">
-        <div class="w-full max-w-md bg-[#18181b] border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden">
-            <div class="px-5 py-4 border-b border-zinc-800">
-                <p id="appConfirmEyebrow" class="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Confirm action</p>
-                <h3 id="appConfirmTitle" class="text-lg font-bold mt-1">Leave?</h3>
+    <!-- App Confirmation Dialog Modal -->
+    <div id="appConfirm" class="hidden fixed inset-0 z-[120] items-center justify-center p-4 party-confirm-backdrop bg-black/75">
+        <div class="glass-modal w-full max-w-md rounded-3xl border border-red-500/30 p-6 shadow-2xl overflow-hidden space-y-4 animate-fade text-center">
+            <div class="w-12 h-12 rounded-full bg-red-600/20 text-red-500 border border-red-500/40 flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
             </div>
-            <div class="px-5 py-5">
-                <p id="appConfirmMessage" class="text-sm text-zinc-300 leading-relaxed">Are you sure?</p>
+            <div>
+                <p id="appConfirmEyebrow" class="text-[9px] uppercase tracking-[0.25em] text-red-400 font-bold">Action Confirmation</p>
+                <h3 id="appConfirmTitle" class="text-lg font-bold text-white mt-0.5">Leave Theater?</h3>
+                <p id="appConfirmMessage" class="text-xs text-gray-300 leading-relaxed mt-2"></p>
             </div>
-            <div class="px-5 py-4 bg-black/20 border-t border-zinc-800 flex justify-end gap-2">
-                <button id="appConfirmCancel" class="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold">Cancel</button>
-                <button id="appConfirmOk" class="px-4 py-2 rounded-lg bg-netflixRed hover:bg-red-700 text-sm font-semibold">Continue</button>
+            <div class="flex gap-2.5 pt-2">
+                <button type="button" id="appConfirmCancel" onclick="closeAppConfirm()" class="flex-1 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.12] text-gray-300 hover:text-white border border-white/[0.08] text-xs font-bold transition cursor-pointer">
+                    Cancel
+                </button>
+                <button type="button" id="appConfirmOk" class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white text-xs font-bold transition shadow-lg shadow-red-600/30 cursor-pointer active:scale-95">
+                    Confirm
+                </button>
             </div>
         </div>
     </div>
 
+    <!-- Main JavaScript Code -->
     <script>
+
         let movies = [];
         let currentMovieIndex = null;
         let isPartyMovieSession = false; // Party queue playback never touches local watch history.
+        
+        // ---- Cinematic Theater Pause Overlay & Fullscreen Chat Ticker (matching ytsync) ----
+        const FUNNY_PAUSE_QUOTES = [
+            "🍿 Hold up! Popcorn refill time...",
+            "🛋️ Intermission! Stretch your legs, grab a snack.",
+            "🫠 Everyone remain calm. The host has paused reality.",
+            "⏳ Time-out! Building dramatic tension...",
+            "🚪 BRB... someone forgot to close the fridge.",
+            "🧑‍🍳 The host is cooking... literally, probably.",
+            "📱 Quick scroll break. We won't tell anyone.",
+            "🦥 Activating ultra-slow-motion mode...",
+            "🫖 Chai / coffee break! Very important business.",
+            "🔧 Hold on... tightening the plot screws.",
+            "🎭 The drama needs a dramatic pause.",
+            "🚨 BREAKING NEWS: The host pressed pause!",
+            "🧠 Brain.exe is taking a quick break...",
+            "🐢 Please remain calm while time moves at turtle speed.",
+            "🌯 Emergency snack deployment in progress...",
+            "⚡ Recharging host brain cells...",
+            "🎥 Camera rolling... eventually.",
+            "🧙 The pause spell has been activated!",
+            "🛑 Plot temporarily unavailable. Please standby!"
+        ];
+        let currentPauseQuote = '';
+
+        function updatePauseOverlay(isPaused) {
+            const pauseOverlay = document.getElementById('pause-overlay');
+            const pauseText = document.getElementById('pause-funny-text');
+            if (!pauseOverlay) return;
+
+            if (isPaused && partyCode && !partyCountdownActive && !playerModal.classList.contains('hidden')) {
+                if (pauseOverlay.classList.contains('hidden') || !currentPauseQuote) {
+                    currentPauseQuote = FUNNY_PAUSE_QUOTES[Math.floor(Math.random() * FUNNY_PAUSE_QUOTES.length)];
+                    if (pauseText) pauseText.innerText = currentPauseQuote;
+                }
+                pauseOverlay.classList.remove('hidden');
+                pauseOverlay.classList.add('flex');
+            } else {
+                currentPauseQuote = '';
+                pauseOverlay.classList.add('hidden');
+                pauseOverlay.classList.remove('flex');
+            }
+        }
+
+        // Ticker ONLY triggers in true fullscreen (matching ytsync line 3384)
+        function showFullscreenChatTicker(msg) {
+            if (!document.fullscreenElement) return;
+            const tickerContainer = document.getElementById('fullscreen-chat-ticker');
+            if (!tickerContainer || playerModal.classList.contains('hidden')) return;
+
+            const el = document.createElement('div');
+            el.className = 'fullscreen-ticker-track text-xs sm:text-sm flex items-center gap-2 bg-black/85 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-red-500/30 shadow-2xl';
+            el.innerHTML = `<span class="text-amber-400">💬</span> <span class="text-red-400 font-bold">${escapeHtml(msg.senderName)}:</span> <span class="text-gray-100 font-medium">${escapeHtml(msg.text)}</span>`;
+            tickerContainer.appendChild(el);
+            setTimeout(() => { if (el && el.parentNode) el.remove(); }, 9500);
+        }
+
+        function updateRoleBadges() {
+            const roleBadge = document.getElementById('roleBadgeIcon');
+            const theaterRole = document.getElementById('theaterRoleBadge');
+            if (!partyCode) {
+                if (roleBadge) { roleBadge.textContent = '🎬'; roleBadge.title = 'Offline / Solo Player'; }
+                if (theaterRole) { theaterRole.textContent = '🎬 Solo'; theaterRole.className = 'hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-zinc-800 text-zinc-300 border border-zinc-700'; }
+            } else if (isPartyHost) {
+                if (roleBadge) { roleBadge.textContent = '👑'; roleBadge.title = 'Host Controls (You are the Host)'; }
+                if (theaterRole) { theaterRole.textContent = '👑 Host'; theaterRole.className = 'hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30'; }
+            } else {
+                if (roleBadge) { roleBadge.textContent = '🎧'; roleBadge.title = 'Guest (Host controls playback)'; }
+                if (theaterRole) { theaterRole.textContent = '🎧 Guest'; theaterRole.className = 'hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'; }
+            }
+        }
+
+        // Dock Tabs switching between Live Chat and Playlist/Queue
+        function switchDockTab(tab) {
+            const chatBtn = document.getElementById('dock-tab-chat-btn');
+            const queueBtn = document.getElementById('dock-tab-queue-btn');
+            const chatPane = document.getElementById('dock-pane-chat');
+            const queuePane = document.getElementById('dock-pane-queue');
+            if (!chatBtn || !queueBtn || !chatPane || !queuePane) return;
+
+            if (tab === 'chat') {
+                chatBtn.className = 'px-3 py-1 rounded-lg font-bold transition text-white bg-red-600 flex items-center gap-1.5 cursor-pointer';
+                queueBtn.className = 'px-3 py-1 rounded-lg font-bold transition text-gray-400 hover:text-white flex items-center gap-1.5 cursor-pointer';
+                chatPane.classList.remove('hidden');
+                queuePane.classList.add('hidden');
+                chatUnread = 0;
+                const badge = document.getElementById('dockChatBadge');
+                if (badge) badge.classList.add('hidden');
+            } else {
+                queueBtn.className = 'px-3 py-1 rounded-lg font-bold transition text-white bg-red-600 flex items-center gap-1.5 cursor-pointer';
+                chatBtn.className = 'px-3 py-1 rounded-lg font-bold transition text-gray-400 hover:text-white flex items-center gap-1.5 cursor-pointer';
+                chatPane.classList.add('hidden');
+                queuePane.classList.remove('hidden');
+                populateQuickQueueSelect();
+                renderPartyQueue();
+            }
+        }
+
+        function populateQuickQueueSelect() {
+            const sel = document.getElementById('quickQueueSelect');
+            if (!sel) return;
+            const prevVal = sel.value;
+            sel.innerHTML = '<option value="">+ Add film from library…</option>';
+            if (!movies || !movies.length) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = '(No films in library yet)';
+                opt.disabled = true;
+                sel.appendChild(opt);
+                return;
+            }
+            movies.forEach((m, idx) => {
+                const opt = document.createElement('option');
+                opt.value = idx;
+                const name = m.cleanName || m.name;
+                opt.textContent = name.length > 26 ? name.slice(0, 24) + '…' : name;
+                opt.title = name;
+                sel.appendChild(opt);
+            });
+            if (prevVal !== '') sel.value = prevVal;
+        }
+
+        function addQuickSelectedMovieToQueue() {
+            const sel = document.getElementById('quickQueueSelect');
+            if (!sel || sel.value === '') return;
+            const index = parseInt(sel.value, 10);
+            if (!isNaN(index) && movies[index]) {
+                addMovieToPartyQueue(index);
+                sel.value = '';
+                renderPartyQueue();
+            }
+        }
+
         let watchHistory = JSON.parse(localStorage.getItem('netflix_watch_history') || '{}');
         let appConfirmAction = null;
 
@@ -811,6 +1419,7 @@
         }
 
         function renderGrid() {
+            populateQuickQueueSelect();
             const displayMovies = getFilteredAndSortedMovies();
             movieGrid.innerHTML = '';
 
@@ -887,7 +1496,7 @@
         // Video Player Open / Close & Subtitle Inbuilt Scanner
         function openPlayer(index, options = {}) {
             if (isPartyHost && partyCode && !playerModal.classList.contains('hidden')) closePartyMediaCalls();
-            setPartyChatToggleLocation(!!partyCode);
+            setPartyChatToggleLocation(true);
             currentMovieIndex = index;
             isPartyMovieSession = !!options.partyCountdown;
             remotePartyPlayback = false;
@@ -898,9 +1507,22 @@
             partyDock.classList.toggle('hidden', !partyCode || chatWasClosed);
             partyDock.classList.toggle('flex', !!partyCode && !chatWasClosed);
             playerModal.classList.toggle('party-docked', !!partyCode && !chatWasClosed);
-            if (partyCode && !chatWasClosed) setChatPanelMode('player'); else if (partyCode) setChatPanelMode('floating');
+            if (partyCode) { setChatPanelMode('player'); setPartyChatToggleLocation(true); }
             const movie = movies[index];
             modalMovieTitle.textContent = movie.cleanName;
+            if (partyCode && isPartyHost && movie) {
+                let existingIdx = partyQueue.findIndex(q => q.name === movie.name || q.title === movie.cleanName);
+                partyQueue.forEach(item => { if (item.status === 'playing') item.status = 'approved'; });
+                if (existingIdx >= 0) {
+                    partyQueue[existingIdx].status = 'playing';
+                } else {
+                    const item = queueItemForMovie(movie, partyName || 'Host');
+                    item.status = 'playing';
+                    partyQueue.unshift(item);
+                }
+                renderPartyQueue();
+                broadcastQueueState();
+            }
 
             // Cancel any previous MKV subtitle scan before switching media.
             mkvScanToken++;
@@ -921,6 +1543,10 @@
             if (currentObjectURL) URL.revokeObjectURL(currentObjectURL);
             currentObjectURL = URL.createObjectURL(movie.file);
             videoPlayer.src = currentObjectURL;
+            videoPlayer.preload = 'auto';
+            try { videoPlayer.load(); } catch(e) {}
+            try { videoPlayer.pause(); } catch(e) {}
+            videoPlayer.currentTime = 0;
 
             // Reset loading/error UI for the new attempt
             const loadingIndicator = document.getElementById('playerLoadingIndicator');
@@ -950,6 +1576,9 @@
 
             playerModal.classList.remove('hidden');
             playerModal.classList.add('flex', 'fade-in');
+            updateRoleBadges();
+            populateQuickQueueSelect();
+            renderPartyQueue();
             showControls();
 
             videoPlayer.onloadedmetadata = () => {
@@ -967,7 +1596,7 @@
                         track.mode = 'hidden';
                         const opt = document.createElement('option');
                         opt.value = i;
-                        opt.textContent = track.label || `Inbuilt Subtitle #${i + 1}`;
+                        const subLbl = track.label || `Inbuilt Subtitle #${i + 1}`; opt.textContent = subLbl.length > 25 ? subLbl.slice(0, 23) + "…" : subLbl; opt.title = subLbl;
                         subtitlesMenu.appendChild(opt);
                     }
                 }
@@ -987,7 +1616,9 @@
                 // Bug fix: the play icon used to flip to "pause" immediately, even if
                 // play() actually failed (e.g. autoplay blocked) - so a video that
                 // silently didn't start still looked like it was playing.
-                if (options.deferAutoplay || (options.partyCountdown && isPartyHost)) {
+                if (options.deferAutoplay || (options.partyCountdown && isPartyHost) || partyCountdownActive || isPartyMovieSession) {
+                    try { videoPlayer.pause(); } catch(e) {}
+                    videoPlayer.currentTime = 0;
                     updatePlayState(false);
                     if (isPartyHost && isPartyMovieSession) setTimeout(callAllGuestsWithVideo, 150);
                 } else {
@@ -1081,6 +1712,7 @@
         function playerHostOnlyMode(isRemote) {
             const partyGuestScreening = !!partyCode && !isPartyHost && !!isPartyMovieSession;
             document.querySelectorAll('#playerModal .host-only-control').forEach(el => el.classList.toggle('hidden', isRemote || partyGuestScreening));
+            updateRoleBadges();
         }
 
         // --- Auto-hide overlay controls during playback ---
@@ -1092,16 +1724,26 @@
             playerTopBar.classList.remove('controls-hidden');
             playerControls.classList.remove('controls-hidden');
             videoContainer.classList.remove('cursor-hidden');
-            scheduleAutoHide();
+            if (document.fullscreenElement) scheduleAutoHide();
         }
         function scheduleAutoHide() {
             clearTimeout(controlsHideTimer);
-            if (videoPlayer.paused) return; // never auto-hide while paused
+            // In separate theater layout, KEEP CONTROLS VISIBLE!
+            // Only auto-hide in true fullscreen mode where the user wants edge-to-edge projection.
+            if (!document.fullscreenElement) {
+                playerTopBar.classList.remove('controls-hidden');
+                playerControls.classList.remove('controls-hidden');
+                videoContainer.classList.remove('cursor-hidden');
+                return;
+            }
+            if (videoPlayer.paused) return;
             controlsHideTimer = setTimeout(() => {
-                playerTopBar.classList.add('controls-hidden');
-                playerControls.classList.add('controls-hidden');
-                videoContainer.classList.add('cursor-hidden');
-            }, 3000);
+                if (document.fullscreenElement) {
+                    playerTopBar.classList.add('controls-hidden');
+                    playerControls.classList.add('controls-hidden');
+                    videoContainer.classList.add('cursor-hidden');
+                }
+            }, 3500);
         }
         ['mousemove', 'touchstart', 'mousedown'].forEach(evt => {
             playerModal.addEventListener(evt, () => {
@@ -1198,13 +1840,15 @@
 
         function showNotification(msg, type = 'success') {
             const div = document.createElement('div');
-            div.className = `fixed bottom-6 right-6 z-[130] px-4 py-3 rounded-md shadow-2xl text-sm font-medium text-white flex items-center gap-2 transition duration-300 ${type === 'error' ? 'bg-netflixRed' : 'bg-zinc-800 border border-zinc-700'}`;
-            div.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-triangle-exclamation text-white' : 'fa-circle-check text-green-500'}"></i> ${msg}`;
+            const isErr = type === 'error';
+            div.className = `fixed top-5 left-1/2 -translate-x-1/2 z-[140] px-5 py-2.5 rounded-full shadow-2xl text-xs sm:text-sm font-semibold text-white flex items-center gap-2.5 transition-all duration-300 backdrop-blur-xl border ${isErr ? 'bg-red-950/90 border-red-500/50 shadow-red-900/40 text-red-100' : 'bg-[#121624]/95 border-emerald-500/40 shadow-black/60 text-emerald-200'} animate-fade`;
+            div.innerHTML = `<i class="fa-solid ${isErr ? 'fa-triangle-exclamation text-red-400' : 'fa-circle-check text-emerald-400'}"></i> <span>${escapeHtml(msg)}</span>`;
             document.body.appendChild(div);
             setTimeout(() => {
                 div.style.opacity = '0';
+                div.style.transform = 'translate(-50%, -10px)';
                 setTimeout(() => div.remove(), 300);
-            }, 3000);
+            }, 3200);
         }
 
         // LMS never uses blocking browser dialogs. Keep this defensive shim so a
@@ -1253,7 +1897,7 @@
                 const newIndex = videoPlayer.textTracks.length - 1;
                 const opt = document.createElement('option');
                 opt.value = newIndex;
-                opt.textContent = `External: ${file.name}`;
+                const extLbl = `External: ${file.name}`; opt.textContent = extLbl.length > 25 ? extLbl.slice(0, 23) + "…" : extLbl; opt.title = file.name;
                 opt.selected = true;
                 subtitlesMenu.appendChild(opt);
 
@@ -1323,7 +1967,7 @@
                     const newIndex = videoPlayer.textTracks.length - 1;
                     const opt = document.createElement('option');
                     opt.value = newIndex;
-                    opt.textContent = `Embedded: ${t.name || t.language || 'Track ' + t.number}`;
+                    const embLbl = `Embedded: ${t.name || t.language || "Track " + t.number}`; opt.textContent = embLbl.length > 25 ? embLbl.slice(0, 23) + "…" : embLbl; opt.title = t.name || t.language || "Track " + t.number;
                     subtitlesMenu.appendChild(opt);
                 });
                 showNotification('Embedded subtitle track(s) found in this MKV.');
@@ -1455,6 +2099,7 @@
 
         function updatePlayState(isPlaying) {
             playPauseIcon.className = isPlaying ? "fa-solid fa-pause" : "fa-solid fa-play";
+            updatePauseOverlay(!isPlaying);
         }
 
         function showPlayIndicator() {
@@ -1498,7 +2143,12 @@
         });
 
         document.addEventListener('fullscreenchange', () => {
-            fullscreenIcon.className = document.fullscreenElement ? "fa-solid fa-compress text-lg" : "fa-solid fa-expand text-lg";
+            const isFs = !!document.fullscreenElement;
+            fullscreenIcon.className = isFs ? "fa-solid fa-compress text-xs sm:text-sm" : "fa-solid fa-expand text-xs sm:text-sm";
+            document.documentElement.classList.toggle('theater-fs', isFs);
+            playerModal.classList.toggle('is-fullscreen', isFs);
+            const exitFsBtn = document.getElementById('exitFullscreenBtn');
+            if (exitFsBtn) exitFsBtn.classList.toggle('hidden', !isFs);
         });
 
         function toggleFullscreen() {
@@ -1963,17 +2613,27 @@
         }
 
         // ---- Reactions: tiny, ephemeral P2P messages, never stored anywhere ----
-        const REACTION_EMOJIS = ['❤️', '😂', '🔥', '👏', '😮', '👍', '😍', '🎉', '💯', '🤯', '🥳', '😭', '🙌', '👀'];
+        const REACTION_EMOJIS = ['❤️', '😂', '😭', '😱', '🤯', '🔥', '👏', '😍', '🥱', '💔', '💃', '🕺', '😘', '💋', '🤗'];
         (function buildReactionBar() {
             const bar = document.getElementById('reactionBar');
+            if (!bar) return;
+            bar.innerHTML = '';
             REACTION_EMOJIS.forEach(emoji => {
                 const btn = document.createElement('button');
-                btn.className = 'reaction-btn text-xl leading-none rounded-md hover:bg-zinc-800 transition shrink-0';
+                btn.className = 'reaction-btn text-xl leading-none rounded-md hover:bg-white/[0.1] active:scale-125 transition shrink-0 cursor-pointer';
                 btn.textContent = emoji;
-                btn.title = 'Send reaction';
+                btn.title = 'Send ' + emoji + ' reaction';
                 btn.onclick = () => sendReaction(emoji);
                 bar.appendChild(btn);
             });
+
+            // Smooth mouse wheel horizontal scrolling on PC
+            bar.addEventListener('wheel', (e) => {
+                if (e.deltaY !== 0) {
+                    e.preventDefault();
+                    bar.scrollLeft += e.deltaY;
+                }
+            }, { passive: false });
         })();
 
         function sendReaction(emoji) {
@@ -1984,8 +2644,11 @@
 
         function spawnFloatingReaction(emoji) {
             const layer = document.getElementById('reactionLayer');
-            const centerX = 18 + Math.random() * 64;
-            const centerY = 58 + Math.random() * 22;
+            if (!layer) return;
+            const centerX = 15 + Math.random() * 70;
+            const centerY = 55 + Math.random() * 25;
+            
+            // 1. Main floating emoji
             const main = document.createElement('span');
             main.className = 'floating-reaction';
             main.textContent = emoji || '❤️';
@@ -1993,14 +2656,18 @@
             main.style.animationDuration = (2.2 + Math.random() * 0.8) + 's';
             layer.appendChild(main);
             main.addEventListener('animationend', () => main.remove());
+            setTimeout(() => { if (main.parentNode) main.remove(); }, 3200);
 
-            // Cinematic burst: a small confetti-like ring + emoji particles.
+            // 2. Expanding shockwave ring
             const ring = document.createElement('span');
             ring.className = 'reaction-ring';
             ring.style.left = centerX + 'vw';
             ring.style.top = centerY + 'vh';
             layer.appendChild(ring);
             ring.addEventListener('animationend', () => ring.remove());
+            setTimeout(() => { if (ring.parentNode) ring.remove(); }, 900);
+
+            // 3. Burst particles
             const burstCount = 8 + Math.floor(Math.random() * 5);
             for (let i = 0; i < burstCount; i++) {
                 const p = document.createElement('span');
@@ -2016,6 +2683,7 @@
                 p.style.animationDelay = (Math.random() * .08) + 's';
                 layer.appendChild(p);
                 p.addEventListener('animationend', () => p.remove());
+                setTimeout(() => { if (p.parentNode) p.remove(); }, 1200);
             }
         }
 
@@ -2044,6 +2712,7 @@
                 playerChatToggleSlot.appendChild(partyChatToggle);
                 partyChatToggle.classList.remove('theatre-chat-toggle');
                 partyChatToggle.classList.add('player-chat-toggle');
+                partyChatToggle.classList.remove('hidden');
             } else if (theatreSlot && partyCode && partyRoomScreen && !partyRoomScreen.classList.contains('hidden')) {
                 theatreSlot.appendChild(partyChatToggle);
                 partyChatToggle.classList.remove('player-chat-toggle');
@@ -2054,6 +2723,7 @@
                 partyChatToggle.classList.remove('player-chat-toggle');
                 partyChatToggle.classList.add('theatre-chat-toggle');
                 if (partyCode) partyChatToggle.classList.remove('hidden');
+                else partyChatToggle.classList.add('hidden');
             }
         }
 
@@ -2065,8 +2735,6 @@
         function showPartyActivePanel() {
             showPartyPane('partyActive');
             document.getElementById('partyCodeDisplay').textContent = partyCode;
-            const chatCodeDisplay = document.getElementById('partyChatCodeDisplay');
-            if (chatCodeDisplay) chatCodeDisplay.textContent = partyCode || '------';
             document.getElementById('partyRoleNote').textContent = isPartyHost
                 ? 'You are the host — playback and queue approvals are yours.'
                 : 'You are a guest — request films, chat, react, and watch the host stream.';
@@ -2107,8 +2775,6 @@
                 partyChatPanel.className = CHAT_PANEL_EMBEDDED_CLASS;
                 partyChatPanel.style.height = '';
                 partyChatToggle.classList.remove('hidden');
-                // Keep the reopen button inside the player's top toolbar so it
-                // stays beside the subtitle controls and works in fullscreen.
                 setPartyChatToggleLocation(true);
             } else {
                 partyChatPanel.className = CHAT_PANEL_FLOATING_CLASS;
@@ -2150,6 +2816,7 @@
         }
 
         function renderPartyMovieGrid() {
+            populateQuickQueueSelect();
             const grid = document.getElementById('partyMovieGrid');
             grid.innerHTML = '';
             if (movies.length === 0) {
@@ -2200,18 +2867,74 @@
 
         function renderPartyQueue() {
             const list = document.getElementById('partyQueueList');
-            if (!list) return;
-            if (!partyQueue.length) { list.innerHTML = `<div class="h-full min-h-24 flex items-center justify-center text-center text-xs text-zinc-600 px-4">The queue is empty.<br>${isPartyHost?'Add films from your library.':'Request a film for the host.'}</div>`; return; }
-            list.innerHTML = partyQueue.map((q,i) => {
+            const theaterList = document.getElementById('partyTheaterQueueList');
+            const badgeCount = document.getElementById('dockQueueCountBadge');
+            const theaterCount = document.getElementById('theaterQueueCount');
+            if (badgeCount) badgeCount.textContent = partyQueue.length;
+            if (theaterCount) theaterCount.textContent = partyQueue.length + ' films';
+            if (!list && !theaterList) return;
+            if (!partyQueue.length) {
+                const emptyMsg = `<div class="h-full min-h-24 flex items-center justify-center text-center text-xs text-gray-500 px-4">The queue is empty.<br>${isPartyHost?'Add films from your library.':'Request a film for the host.'}</div>`;
+                if (list) list.innerHTML = emptyMsg;
+                if (theaterList) theaterList.innerHTML = emptyMsg;
+                return;
+            }
+            const renderedHtml = partyQueue.map((q,i) => {
                 const status = q.status || 'pending';
                 const localIndex = isPartyHost ? movies.findIndex(m => m.name === q.name || m.cleanName === q.title) : -1;
-                const statusLabel = status === 'approved' ? 'Approved' : status === 'rejected' ? 'Rejected' : 'Pending';
-                const statusClass = status === 'approved' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : status === 'rejected' ? 'text-red-400 bg-red-400/10 border-red-400/20' : 'text-amber-300 bg-amber-300/10 border-amber-300/20';
-                return `<div class="party-queue-item rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">
-                    <div class="flex items-start gap-2"><div class="w-8 h-8 shrink-0 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold">${escapeHtml((q.requester||'?').slice(0,1).toUpperCase())}</div><div class="min-w-0 flex-1"><p class="text-xs font-semibold text-white line-clamp-2">${escapeHtml(q.title)}</p><p class="text-[10px] text-zinc-500 mt-1">${escapeHtml(q.requester||'Guest')}</p></div><span class="text-[9px] px-1.5 py-1 rounded border ${statusClass}">${statusLabel}</span></div>
-                    ${isPartyHost ? `<div class="grid grid-cols-2 gap-2 mt-3">${status !== 'approved' ? `<button onclick="approvePartyQueue(${i})" class="bg-emerald-600/90 hover:bg-emerald-600 rounded-md py-1.5 text-[11px] font-semibold"><i class="fa-solid fa-check mr-1"></i> Accept</button>` : `<button onclick="playQueuedMovie(${i})" class="bg-netflixRed hover:bg-red-700 rounded-md py-1.5 text-[11px] font-semibold ${localIndex<0?'opacity-40 pointer-events-none':''}"><i class="fa-solid fa-play mr-1"></i> Play</button>`}<button onclick="rejectPartyQueue(${i})" class="bg-zinc-800 hover:bg-zinc-700 rounded-md py-1.5 text-[11px] font-semibold text-zinc-300"><i class="fa-solid fa-xmark mr-1"></i> ${status==='approved'?'Remove':'Reject'}</button></div>${localIndex<0 ? `<p class="mt-2 text-[10px] text-amber-300">Not found in host library.</p>` : ''}` : (q.requesterPeerId === peer?.id ? `<button onclick="removeOwnQueueRequest(${i})" class="mt-3 w-full bg-zinc-800 hover:bg-zinc-700 rounded-md py-1.5 text-[11px] font-semibold">Cancel request</button>` : `<div class="mt-3 text-[10px] text-zinc-500">${status === 'approved' ? 'Approved by host — up next.' : 'Waiting for host decision.'}</div>`)}
+                const isPlaying = status === 'playing';
+                const statusLabel = isPlaying ? 'Now Playing' : status === 'approved' ? 'Up Next' : status === 'rejected' ? 'Rejected' : 'Pending';
+                const statusClass = isPlaying ? 'text-red-400 bg-red-600/20 border-red-500/40 font-bold' : status === 'approved' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : status === 'rejected' ? 'text-red-400 bg-red-400/10 border-red-400/20' : 'text-amber-300 bg-amber-300/10 border-amber-300/20';
+                return `<div class="party-queue-item rounded-2xl border ${isPlaying ? 'border-red-500/40 bg-red-950/20 shadow-md shadow-red-950/30' : 'border-white/[0.08] bg-[#121624]/80'} p-3 transition">
+                    <div class="flex items-start gap-2.5">
+                        <div class="w-8 h-8 shrink-0 rounded-xl ${isPlaying ? 'bg-red-600/30 text-red-400' : 'bg-white/[0.08] text-gray-300'} flex items-center justify-center text-[10px] font-bold font-mono">
+                            ${isPlaying ? '▶' : escapeHtml((q.requester||'?').slice(0,1).toUpperCase())}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs font-semibold text-white truncate" title="${escapeHtml(q.title)}">${escapeHtml(q.title)}</p>
+                            <p class="text-[10px] text-gray-400 mt-0.5">${escapeHtml(q.requester||'Guest')}</p>
+                        </div>
+                        <span class="text-[9px] px-2 py-0.5 rounded-full border ${statusClass} shrink-0 flex items-center gap-1">
+                            ${isPlaying ? '<span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>' : ''}
+                            ${statusLabel}
+                        </span>
+                    </div>
+                    ${isPartyHost ? `
+                        ${isPlaying ? `
+                            <div class="mt-2.5">
+                                <button onclick="rejectPartyQueue(${i})" class="w-full bg-white/[0.06] hover:bg-white/[0.12] rounded-xl py-1.5 text-[11px] font-semibold text-gray-300 border border-white/[0.08] transition cursor-pointer">
+                                    <i class="fa-solid fa-xmark mr-1"></i> Remove from Queue
+                                </button>
+                            </div>` : `
+                            <div class="grid grid-cols-2 gap-2 mt-2.5">
+                                ${status !== 'approved' ? `
+                                    <button onclick="approvePartyQueue(${i})" class="bg-emerald-600/90 hover:bg-emerald-600 text-white rounded-xl py-1.5 text-[11px] font-semibold transition cursor-pointer">
+                                        <i class="fa-solid fa-check mr-1"></i> Accept
+                                    </button>` : `
+                                    <button onclick="playQueuedMovie(${i})" class="bg-red-600 hover:bg-red-500 text-white rounded-xl py-1.5 text-[11px] font-bold transition shadow-sm cursor-pointer ${localIndex<0?'opacity-40 pointer-events-none':''}">
+                                        <i class="fa-solid fa-play mr-1"></i> Play Next
+                                    </button>`}
+                                <button onclick="rejectPartyQueue(${i})" class="bg-white/[0.06] hover:bg-white/[0.12] rounded-xl py-1.5 text-[11px] font-semibold text-gray-300 border border-white/[0.08] transition cursor-pointer">
+                                    <i class="fa-solid fa-xmark mr-1"></i> ${status==='approved'?'Remove':'Reject'}
+                                </button>
+                            </div>
+                        `}
+                        ${localIndex<0 ? `<p class="mt-1.5 text-[10px] text-amber-300 font-medium">Film not in host loaded files.</p>` : ''}
+                    ` : (isPlaying ? `
+                        <div class="mt-2 text-[10px] text-red-400 font-bold flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span> Currently screening in room
+                        </div>
+                    ` : (q.requesterPeerId === peer?.id ? `
+                        <button onclick="removeOwnQueueRequest(${i})" class="mt-2.5 w-full bg-white/[0.06] hover:bg-white/[0.12] rounded-xl py-1.5 text-[11px] font-semibold text-gray-300 border border-white/[0.08] transition cursor-pointer">
+                            Cancel request
+                        </button>
+                    ` : `
+                        <div class="mt-2 text-[10px] text-gray-400">${status === 'approved' ? 'Approved by host — up next.' : 'Waiting for host decision.'}</div>
+                    `))}
                 </div>`;
             }).join('');
+            if (list) list.innerHTML = renderedHtml;
+            if (theaterList) theaterList.innerHTML = renderedHtml;
         }
 
         function broadcastQueueState() { if (isPartyHost) sendPartyData({type:'queue-state', queue:partyQueue}); }
@@ -2244,10 +2967,15 @@
         function playQueuedMovie(index) {
             if (!isPartyHost || !partyQueue[index]) return;
             const q = partyQueue[index];
-            if (q.status !== 'approved') { addPartyAudit('Accept the queue item before playing it.', 'warn'); return; }
+            if (q.status !== 'approved' && q.status !== 'playing') { addPartyAudit('Accept the queue item before playing it.', 'warn'); return; }
             const localIndex = movies.findIndex(m => m.name === q.name || m.cleanName === q.title);
             if (localIndex < 0) { addPartyAudit(`Could not find “${q.title}” in host library.`, 'warn'); return; }
-            partyQueue.splice(index,1);
+            
+            // Do NOT remove from queue! Mark current movie as 'playing' so it stays visible in queue/playlist!
+            partyQueue.forEach((item, idx) => {
+                if (idx === index) item.status = 'playing';
+                else if (item.status === 'playing') item.status = 'approved';
+            });
             renderPartyQueue(); broadcastQueueState();
             startPartyMovie(localIndex, q);
         }
@@ -2271,8 +2999,9 @@
             partyRoomScreen.classList.add('hidden'); partyRoomScreen.classList.remove('flex');
             setChatPanelMode('player');
             openPlayer(index, {partyCountdown:true, deferAutoplay:true});
-            addPartyAudit(`Loading “${title}” for the screening.`, 'good');
-            waitForHostMovieReady(() => beginSynchronizedPartyCountdown(movie, queueItem));
+            addPartyAudit(`Starting synchronized screening for “${title}”.`, 'good');
+            // Start countdown IMMEDIATELY! The video buffers in background during the 4-second timer.
+            beginSynchronizedPartyCountdown(movie, queueItem);
         }
 
         function waitForHostMovieReady(done) {
@@ -2291,6 +3020,8 @@
             const duration = 4000;
             const endAt = Date.now() + duration;
             partyHostPlaying = false;
+            try { videoPlayer.pause(); videoPlayer.currentTime = 0; } catch(e) {}
+            updatePlayState(false);
             showPartyCountdown(movie.cleanName, 4, () => {
                 if (playerModal.classList.contains('hidden')) return;
                 videoPlayer.play().then(() => {
@@ -2298,8 +3029,11 @@
                     callAllGuestsWithVideo();
                     sendPartyData({type:'party-start', title:movie.cleanName, name:movie.name, playAt:endAt});
                     broadcastSync();
-                }).catch(() => addPartyAudit('Press Play to begin the screening.', 'warn'));
-            });
+                }).catch(() => {
+                    addPartyAudit('Press Play to begin the screening.', 'warn');
+                    updatePlayState(false);
+                });
+            }, endAt);
             sendPartyData({type:'movie-select', title:movie.cleanName, name:movie.name, countdown:4, playAt:endAt});
         }
 
@@ -2351,21 +3085,13 @@
             if(playerModal.classList.contains('hidden')){
                 partyRoomScreen.classList.add('hidden'); partyRoomScreen.classList.remove('flex'); setChatPanelMode('player'); openRemotePartyPlayer(title,pendingPartyStream);
             }
+            try { videoPlayer.pause(); } catch(e) {}
+            updatePlayState(false);
             showPartyCountdown(title, seconds, () => {
                 if (!isPartyHost) { partyHostPlaying = true; startGuestRemotePlayback(); }
             }, playAt);
         }
 
-
-        function copyPartyCode() {
-            if (!partyCode) return;
-            const code = partyCode.toUpperCase();
-            const write = navigator.clipboard && navigator.clipboard.writeText
-                ? navigator.clipboard.writeText(code)
-                : Promise.reject(new Error('Clipboard unavailable'));
-            write.then(() => showNotification(`Party code ${code} copied.`, 'success'))
-                .catch(() => showNotification(`Party code: ${code}`, 'info'));
-        }
 
         function copyPartyLink() {
             const url = new URL(window.location.href);
@@ -2410,8 +3136,6 @@
             isPartyMovieSession = false;
             partyStatusBadge.classList.add('hidden');
             partyStatusBadge.classList.remove('flex');
-            const chatCodeDisplay = document.getElementById('partyChatCodeDisplay');
-            if (chatCodeDisplay) chatCodeDisplay.textContent = '------';
             partyRoomScreen.classList.add('hidden');
             partyRoomScreen.classList.remove('flex');
             setChatPanelMode('floating');
@@ -2424,6 +3148,10 @@
 
         // Chat UI
         function togglePartyChat() {
+            if (!partyCode) {
+                showNotification('Live Chat is active during Watch Parties. Create or join a room to chat!', 'info');
+                return;
+            }
             const isHidden = partyChatPanel.classList.contains('hidden');
             if (isHidden) {
                 if (partyRoomScreen.classList.contains('flex') && !playerModal.classList.contains('flex')) {
@@ -2461,22 +3189,52 @@
 
         function addChatMessage(name, text, system) {
             const wrap = document.getElementById('partyChatMessages');
-            const div = document.createElement('div');
+            if (!wrap) return;
+            const msgEl = document.createElement('div');
+            const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            
             if (system) {
-                div.className = 'text-xs text-zinc-500 italic text-center';
-                div.textContent = text;
+                msgEl.className = 'text-center my-1.5 animate-fade shrink-0';
+                msgEl.innerHTML = `<span class="inline-flex items-center gap-1.5 text-[10px] font-semibold text-gray-400 bg-white/[0.06] border border-white/[0.08] px-3 py-1 rounded-full italic"><span>📢</span> <span>${escapeHtml(text)}</span></span>`;
             } else {
-                div.className = 'text-zinc-200';
-                div.innerHTML = `<span class="font-semibold text-netflixRed">${escapeHtml(name || 'Someone')}:</span> <span class="break-words">${escapeHtml(text)}</span>`;
+                const isMe = name === partyName;
+                msgEl.className = 'group animate-fade shrink-0';
+                msgEl.innerHTML = `
+                    <div class="p-2 sm:p-2.5 rounded-2xl ${isMe ? 'bg-red-950/30 border border-red-500/30 ml-2.5' : 'bg-white/[0.05] border border-white/[0.08] mr-2.5'} text-gray-200 shadow-sm transition">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <div class="flex items-center gap-1.5 font-bold text-xs truncate">
+                                <span class="w-5 h-5 rounded-full ${isMe ? 'bg-red-600/30 text-red-400' : 'bg-white/[0.1] text-gray-300'} flex items-center justify-center text-[10px] shrink-0 font-mono">
+                                    ${escapeHtml((name || '?').slice(0, 1).toUpperCase())}
+                                </span>
+                                <span class="${isMe ? 'text-red-400' : 'text-gray-200'} font-semibold truncate">${escapeHtml(name || 'Guest')}</span>
+                                ${isPartyHost && isMe ? '<span class="text-[9px] text-amber-400 font-bold ml-0.5" title="Host">👑</span>' : ''}
+                            </div>
+                            <span class="text-[9px] text-gray-500 font-mono shrink-0">${timeStr}</span>
+                        </div>
+                        <p class="text-xs sm:text-sm text-gray-100 font-medium break-words leading-relaxed pl-6.5 whitespace-pre-wrap">${escapeHtml(text)}</p>
+                    </div>
+                `;
             }
-            wrap.appendChild(div);
+            wrap.appendChild(msgEl);
             wrap.scrollTop = wrap.scrollHeight;
 
             if (partyChatPanel.classList.contains('hidden')) {
                 chatUnread++;
                 const badge = document.getElementById('partyChatBadge');
-                badge.textContent = chatUnread > 9 ? '9+' : chatUnread;
-                badge.classList.remove('hidden');
+                if (badge) {
+                    badge.textContent = chatUnread > 9 ? '9+' : chatUnread;
+                    badge.classList.remove('hidden');
+                }
+                const dockBadge = document.getElementById('dockChatBadge');
+                if (dockBadge) {
+                    dockBadge.textContent = chatUnread > 9 ? '9+' : chatUnread;
+                    dockBadge.classList.remove('hidden');
+                }
+            }
+
+            // Fullscreen chat ticker: ONLY when in true fullscreen! (Matching ytsync)
+            if (!system && document.fullscreenElement) {
+                showFullscreenChatTicker({ senderName: name || 'Someone', text });
             }
         }
         function addChatSystemMessage(text) { addChatMessage(null, text, true); }
@@ -2532,6 +3290,25 @@
                 showNotification(`This link is for watch party ${code.toUpperCase()} - enter a name and hit Join.`);
             }
         })();
+    
+        // Timeline Seek Lock Toggle (prevents accidental scrubs in theater)
+        let seekLocked = false;
+        const seekLockBtn = document.getElementById('seekLockBtn');
+        if (seekLockBtn) {
+            seekLockBtn.addEventListener('click', () => {
+                seekLocked = !seekLocked;
+                seekLockBtn.textContent = seekLocked ? '🔒' : '🔓';
+                seekLockBtn.title = seekLocked ? 'Timeline seek bar is locked' : 'Lock timeline seek bar (prevent mistouch)';
+                seekLockBtn.classList.toggle('text-amber-400', seekLocked);
+                seekLockBtn.classList.toggle('border-amber-500/50', seekLocked);
+                progressBar.style.pointerEvents = seekLocked ? 'none' : 'auto';
+            });
+        }
+        const exitFullscreenBtn = document.getElementById('exitFullscreenBtn');
+        if (exitFullscreenBtn) {
+            exitFullscreenBtn.addEventListener('click', toggleFullscreen);
+        }
+
     </script>
 </body>
 </html>
