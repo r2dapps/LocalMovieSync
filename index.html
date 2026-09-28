@@ -196,6 +196,41 @@
         @keyframes reactionBurst { 0% { opacity:0; transform:translate(0,0) scale(.3) rotate(0deg); } 12% { opacity:1; } 100% { opacity:0; transform:translate(var(--dx),var(--dy)) scale(.95) rotate(var(--rot)); } }
         .reaction-ring { position:absolute; width:20px; height:20px; border:2px solid rgba(255,255,255,.65); border-radius:999px; opacity:0; animation:reactionRing .65s ease-out forwards; }
         @keyframes reactionRing { 0% { opacity:.8; transform:translate(-50%,-50%) scale(.3); } 100% { opacity:0; transform:translate(-50%,-50%) scale(5); } }
+        /* Party chat: keep a reopen button available. In the player it sits in
+           the top toolbar beside subtitles; on mobile the open chat occupies
+           the bottom while the video remains in the upper portion. */
+        #partyChatToggle.player-chat-toggle { position:relative !important; top:auto !important; right:auto !important; }
+        #partyChatToggle.player-chat-toggle button { height:38px; min-height:38px; padding:0 .7rem; }
+        #partyChatToggle.theatre-chat-toggle { position:relative !important; top:auto !important; right:auto !important; }
+        #partyChatToggle.theatre-chat-toggle button { height:38px; min-height:38px; }
+        #partyChatCodeDisplay { letter-spacing:.12em; }
+        #playerModal.party-docked #playerPartyChatDock { overflow:hidden; }
+        #playerModal.party-docked #playerPartyChatSlot { min-height:0; height:100%; }
+        @media (max-width:767px) {
+            #playerModal.party-docked #playerPartyChatDock {
+                top:auto !important; left:0 !important; right:0 !important; bottom:0 !important;
+                width:100% !important; height:min(42vh,300px) !important;
+                border-left:0; border-top:1px solid #27272a;
+            }
+            #playerModal.party-docked #videoContainer {
+                width:100% !important; height:calc(100% - min(42vh,300px)) !important; margin-right:0 !important;
+            }
+            #playerModal.party-docked #playerControls {
+                right:0 !important; bottom:min(42vh,300px) !important;
+            }
+            #playerModal.party-docked #playerTopBar { padding-right:.75rem !important; }
+            #playerModal.party-docked #playerTopBar > div:last-child {
+                gap:.3rem; overflow-x:auto; scrollbar-width:none; max-width:62vw;
+            }
+            #playerModal.party-docked #playerTopBar > div:last-child::-webkit-scrollbar { display:none; }
+            #playerModal.party-docked #playerChatToggleSlot { display:flex; flex-shrink:0; }
+            #playerModal.party-docked #playerChatToggleSlot #partyChatToggle.player-chat-toggle button {
+                width:38px; padding:0; justify-content:center;
+            }
+            #playerModal.party-docked #playerChatToggleSlot .chat-label { display:none; }
+            #partyChatCodeDisplay { max-width:68px; overflow:hidden; text-overflow:ellipsis; }
+        }
+
         @media (max-width:1279px) {
             #partyRoomScreen .theatre-content-grid { grid-template-columns:minmax(0,1fr) 280px; }
             #partyRoomChatSlot { display:none; }
@@ -241,7 +276,7 @@
             #partyRoomScreen .theatre-content-grid > aside:last-of-type { min-height:420px; }
             #partyRoomScreen > div:first-child { flex-wrap:wrap; }
             #partyRoomScreen > div:first-child > div:last-child { width:100%; justify-content:flex-end; }
-            #partyChatToggle.theatre-chat-toggle { top:72px !important; right:12px !important; }
+            #partyChatToggle.theatre-chat-toggle { top:auto !important; right:auto !important; }
             #partyChatPanel { top:122px; right:12px; left:12px; width:auto; height:min(62vh,480px) !important; }
             #playerPartyChatDock { top:auto; left:0; right:0; bottom:0; width:100% !important; height:min(42vh,300px); border-left:0; border-top:1px solid #27272a; }
             #playerModal.party-docked #playerControls { right:0; bottom:min(42vh,300px); }
@@ -390,9 +425,14 @@
     </div>
 
     <div id="partyChatPanel" class="hidden fixed top-[140px] right-5 z-[84] w-80 max-w-[calc(100vw-2rem)] bg-netflixCard border border-zinc-700 rounded-lg shadow-2xl flex-col overflow-hidden" style="height:min(520px,calc(100vh - 170px));">
-        <div class="bg-zinc-900 px-4 py-3 flex items-center justify-between border-b border-zinc-800">
-            <span class="font-semibold text-sm flex items-center gap-2"><i class="fa-solid fa-users text-netflixRed"></i> Party Chat <span id="partyChatCount" class="text-zinc-500 font-normal"></span></span>
-            <button onclick="togglePartyChat()" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        <div class="bg-zinc-900 px-3 sm:px-4 py-3 flex items-center justify-between gap-2 border-b border-zinc-800">
+            <div class="min-w-0 flex items-center gap-2">
+                <span class="font-semibold text-sm flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-users text-netflixRed"></i> Party Chat <span id="partyChatCount" class="text-zinc-500 font-normal"></span></span>
+                <button onclick="copyPartyCode()" title="Copy party code" class="shrink-0 inline-flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-md px-2 py-1 text-[10px] sm:text-xs font-mono text-zinc-200 transition">
+                    <span id="partyChatCodeDisplay">------</span><i class="fa-regular fa-copy text-zinc-400"></i>
+                </button>
+            </div>
+            <button onclick="togglePartyChat()" title="Close chat" class="shrink-0 text-zinc-400 hover:text-white p-1"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div id="partyChatMessages" class="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm"></div>
         <div class="px-2 pt-1 pb-2 border-t border-zinc-800 flex items-center justify-between gap-1" id="reactionBar">
@@ -2025,6 +2065,8 @@
         function showPartyActivePanel() {
             showPartyPane('partyActive');
             document.getElementById('partyCodeDisplay').textContent = partyCode;
+            const chatCodeDisplay = document.getElementById('partyChatCodeDisplay');
+            if (chatCodeDisplay) chatCodeDisplay.textContent = partyCode || '------';
             document.getElementById('partyRoleNote').textContent = isPartyHost
                 ? 'You are the host — playback and queue approvals are yours.'
                 : 'You are a guest — request films, chat, react, and watch the host stream.';
@@ -2065,7 +2107,9 @@
                 partyChatPanel.className = CHAT_PANEL_EMBEDDED_CLASS;
                 partyChatPanel.style.height = '';
                 partyChatToggle.classList.remove('hidden');
-                setPartyChatToggleLocation(false);
+                // Keep the reopen button inside the player's top toolbar so it
+                // stays beside the subtitle controls and works in fullscreen.
+                setPartyChatToggleLocation(true);
             } else {
                 partyChatPanel.className = CHAT_PANEL_FLOATING_CLASS;
                 partyChatPanel.style.height = 'min(520px,calc(100vh - 170px))';
@@ -2313,6 +2357,16 @@
         }
 
 
+        function copyPartyCode() {
+            if (!partyCode) return;
+            const code = partyCode.toUpperCase();
+            const write = navigator.clipboard && navigator.clipboard.writeText
+                ? navigator.clipboard.writeText(code)
+                : Promise.reject(new Error('Clipboard unavailable'));
+            write.then(() => showNotification(`Party code ${code} copied.`, 'success'))
+                .catch(() => showNotification(`Party code: ${code}`, 'info'));
+        }
+
         function copyPartyLink() {
             const url = new URL(window.location.href);
             url.searchParams.set('party', partyCode);
@@ -2356,6 +2410,8 @@
             isPartyMovieSession = false;
             partyStatusBadge.classList.add('hidden');
             partyStatusBadge.classList.remove('flex');
+            const chatCodeDisplay = document.getElementById('partyChatCodeDisplay');
+            if (chatCodeDisplay) chatCodeDisplay.textContent = '------';
             partyRoomScreen.classList.add('hidden');
             partyRoomScreen.classList.remove('flex');
             setChatPanelMode('floating');
