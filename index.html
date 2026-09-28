@@ -2,7 +2,7 @@
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LocalMovieSync (LMS) - Local Movie Browser, VLC Player & Watch Party</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -156,7 +156,99 @@
         }
         .reaction-btn { transition: transform 0.15s ease; }
         .reaction-btn:active { transform: scale(1.3); }
-    </style>
+    
+        /* Watch-party theatre / player layout */
+        #playerPartyChatDock .party-chat-inner { height:100%; }
+                #playerModal.party-docked #videoContainer { width:calc(100% - 340px); margin-right:340px; }
+        .party-remote .host-only-control { display:none !important; }
+        
+        /* Theatre UX / responsive layout */
+        #partyChatToggle button { box-shadow: 0 10px 28px rgba(0,0,0,.42); }
+        #partyChatToggle.player-chat-toggle { position:relative !important; top:auto !important; right:auto !important; z-index:40 !important; }
+        #partyChatToggle.player-chat-toggle button { min-height:42px; padding:.55rem .8rem; border-radius:.65rem; width:auto; height:auto; font-size:.78rem; display:flex; align-items:center; gap:.45rem; }
+        #partyChatToggle.theatre-chat-toggle { position:relative !important; top:auto !important; right:auto !important; z-index:40 !important; }
+        #partyChatToggle.theatre-chat-toggle button { min-height:38px; width:auto; height:38px; padding:.5rem .75rem; border-radius:.6rem; font-size:.75rem; display:flex; align-items:center; gap:.45rem; white-space:nowrap; }
+        #partyChatToggle.theatre-chat-toggle button .chat-label { display:inline; }
+        #partyMovieGrid { grid-template-columns:repeat(auto-fill,minmax(185px,1fr)); grid-auto-rows:max-content; align-content:start; }
+        .party-movie-card { min-width:0; min-height:0; }
+        .party-movie-poster { aspect-ratio:1/1; min-height:0 !important; height:auto !important; }
+        .party-movie-card .party-add-queue { min-height:38px; }
+        #partyRoomScreen { overflow:hidden; }
+        #partyRoomScreen .theatre-content-grid { min-height:0; }
+        #partyRoomScreen .theatre-content-grid > section, #partyRoomScreen .theatre-content-grid > aside { min-width:0; }
+        #partyAuditPanel { top:72px !important; right:12px !important; }
+        #partyChatPanel { overscroll-behavior:contain; }
+        #partyChatPanel input { min-width:0; }
+        #reactionBar { overflow-x:auto; overflow-y:hidden; justify-content:flex-start; scrollbar-width:none; -ms-overflow-style:none; }
+        #reactionBar::-webkit-scrollbar { display:none; }
+        #reactionBar .reaction-btn { flex:0 0 34px; width:34px; min-width:34px; height:34px; display:flex; align-items:center; justify-content:center; }
+        #playerModal.party-docked #playerPartyChatDock { width:min(340px,31vw); }
+        #playerModal.party-docked #playerTopBar { padding-right:calc(min(340px,31vw) + 1rem); }
+        #playerModal.party-docked #playerControls { right:min(340px,31vw); }
+        #playerModal.party-docked #videoContainer { width:calc(100% - min(340px,31vw)); margin-right:min(340px,31vw); }
+        .party-queue-item { transition:border-color .18s ease, transform .18s ease, background .18s ease; }
+        .party-queue-item:hover { border-color:#52525b; transform:translateY(-1px); }
+        .party-confirm-backdrop { backdrop-filter:blur(10px); }
+        .party-mode { overflow:hidden !important; }
+        html.party-mode { overflow:hidden !important; }
+        .theatre-header-actions { flex-shrink:0; }
+        .reaction-burst-particle { position:absolute; font-size:1.15rem; opacity:0; animation:reactionBurst .9s cubic-bezier(.2,.8,.2,1) forwards; will-change:transform,opacity; }
+        @keyframes reactionBurst { 0% { opacity:0; transform:translate(0,0) scale(.3) rotate(0deg); } 12% { opacity:1; } 100% { opacity:0; transform:translate(var(--dx),var(--dy)) scale(.95) rotate(var(--rot)); } }
+        .reaction-ring { position:absolute; width:20px; height:20px; border:2px solid rgba(255,255,255,.65); border-radius:999px; opacity:0; animation:reactionRing .65s ease-out forwards; }
+        @keyframes reactionRing { 0% { opacity:.8; transform:translate(-50%,-50%) scale(.3); } 100% { opacity:0; transform:translate(-50%,-50%) scale(5); } }
+        @media (max-width:1279px) {
+            #partyRoomScreen .theatre-content-grid { grid-template-columns:minmax(0,1fr) 280px; }
+            #partyRoomChatSlot { display:none; }
+        }
+        @media (max-width:900px) {
+            #partyRoomScreen .theatre-content-grid { display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden; padding:12px; }
+            #partyRoomScreen .theatre-content-grid > section { flex:0 0 auto; min-height:0; height:min(58vh,620px); }
+            #partyRoomScreen .theatre-content-grid > section #partyMovieGrid { overflow-y:auto; }
+            #partyRoomScreen .theatre-content-grid > aside { flex:0 0 auto; min-height:280px; max-height:46vh; }
+            #partyRoomScreen .theatre-content-grid > aside:last-of-type { display:none; }
+            #partyRoomScreen { overflow:hidden; }
+            #partyRoomScreen > div:first-child { flex-wrap:nowrap; }
+            .theatre-header-actions { gap:4px; }
+            .theatre-header-actions .theatre-action { padding:.5rem .6rem; }
+            #partyAuditPanel { top:68px !important; right:8px !important; width:min(390px,calc(100vw - 16px)); max-height:60vh; }
+        }
+        @media (max-width:640px) {
+            #partyRoomScreen > div:first-child { padding:.65rem .7rem; }
+            #partyRoomScreen > div:first-child > div:first-child { min-width:0; gap:.5rem; }
+            #partyRoomScreen > div:first-child h2 { font-size:.9rem; }
+            #partyRoomScreen > div:first-child p { font-size:.65rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:42vw; }
+            #partyRoomScreen > div:first-child .theatre-header-actions { margin-left:auto; }
+            .theatre-header-actions .theatre-action { width:38px; height:38px; padding:0; justify-content:center; }
+            #partyChatToggle.theatre-chat-toggle button { height:38px; min-height:38px; padding:0 .6rem; }
+            #partyChatToggle.theatre-chat-toggle button .chat-label { display:none; }
+            #partyMovieGrid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem; }
+            .party-movie-card .party-movie-poster { aspect-ratio:1/1; }
+            .party-movie-card .p-3 { padding:.65rem; }
+            .party-movie-card .text-sm { font-size:.75rem; }
+            .party-movie-card .party-add-queue { min-height:36px; padding:.45rem .4rem; font-size:.68rem; }
+            #partyAuditPanel { top:64px !important; }
+            #partyChatPanel { top:74px !important; left:8px !important; right:8px !important; width:auto !important; height:min(62vh,460px) !important; }
+        }
+        @media (min-width:1280px) {
+            #partyRoomScreen .theatre-content-grid { grid-template-columns:minmax(0,1fr) 300px 320px; }
+        }
+
+        .party-countdown-pulse { animation: partyPulse 1s ease-in-out infinite; }
+        @media (max-width: 767px) {
+            #partyRoomScreen .theatre-content-grid { overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; }
+            #partyRoomScreen .theatre-content-grid > section { flex:0 0 auto; min-height:70vh; }
+            #partyRoomScreen .theatre-content-grid > aside { flex:0 0 auto; min-height:360px; }
+            #partyRoomScreen .theatre-content-grid > aside:last-of-type { min-height:420px; }
+            #partyRoomScreen > div:first-child { flex-wrap:wrap; }
+            #partyRoomScreen > div:first-child > div:last-child { width:100%; justify-content:flex-end; }
+            #partyChatToggle.theatre-chat-toggle { top:72px !important; right:12px !important; }
+            #partyChatPanel { top:122px; right:12px; left:12px; width:auto; height:min(62vh,480px) !important; }
+            #playerPartyChatDock { top:auto; left:0; right:0; bottom:0; width:100% !important; height:min(42vh,300px); border-left:0; border-top:1px solid #27272a; }
+            #playerModal.party-docked #playerControls { right:0; bottom:min(42vh,300px); }
+            #playerModal.party-docked #videoContainer { width:100%; height:calc(100% - min(42vh,300px)); margin-right:0; }
+        }
+        @keyframes partyPulse { 50% { transform:scale(1.04); opacity:.82; } }
+</style>
 </head>
 <body class="min-h-screen flex flex-col bg-netflixDark text-white selection:bg-netflixRed selection:text-white">
 
@@ -184,7 +276,7 @@
                 <i class="fa-solid fa-users"></i> Watch Party
             </button>
             <button onclick="clearHistory()" title="Clear Watch History" class="bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white p-2 rounded-md border border-zinc-800 transition">
-                <i class="fa-solid fa-rotate-right"></i>
+                <i class="fa-solid fa-clock-rotate-left"></i>
             </button>
         </div>
     </header>
@@ -203,7 +295,7 @@
         </div>
     </section>
 
-    <nav class="sticky top-[73px] z-30 bg-netflixDark/90 backdrop-blur-md px-6 py-3 border-b border-zinc-800 flex flex-wrap items-center justify-between gap-4">
+    <nav class="relative z-30 bg-netflixDark/90 backdrop-blur-md px-6 py-3 border-b border-zinc-800 flex flex-wrap items-center justify-between gap-4">
         <div class="flex items-center space-x-2 flex-1 min-w-[240px] max-w-md bg-zinc-900/80 border border-zinc-700 rounded-md px-3 py-1.5 focus-within:border-netflixRed transition">
             <i class="fa-solid fa-magnifying-glass text-zinc-400 text-sm"></i>
             <input type="text" id="searchInput" placeholder="Search movies by title..." class="bg-transparent border-none outline-none text-sm w-full text-white placeholder-zinc-500">
@@ -255,8 +347,8 @@
             </div>
 
             <div id="partyIdle" class="space-y-4">
-                <p class="text-sm text-zinc-400">Host a watch party from this tab, or join one someone shared with you. Everyone needs their own copy of the movie file loaded — this only syncs play/pause/seek, chat, and reactions, peer-to-peer. Nothing video-related is ever uploaded.</p>
-                <input id="partyNameInput" type="text" maxlength="20" placeholder="Your display name" class="w-full bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-sm outline-none focus:border-netflixRed">
+                <p class="text-sm text-zinc-400">Start a private theatre from this browser. Your display name is remembered on this device. Only the host chooses what actually plays; guests can request titles and chat while the host streams the movie.</p>
+                <input id="partyNameInput" type="text" maxlength="20" placeholder="Your theatre name" class="w-full bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-sm outline-none focus:border-netflixRed">
                 <button onclick="createParty()" class="w-full bg-netflixRed hover:bg-red-700 py-2.5 rounded-md font-semibold text-sm transition">
                     <i class="fa-solid fa-plus"></i> Start a Watch Party
                 </button>
@@ -290,14 +382,14 @@
     </div>
 
     <!-- Watch Party: floating chat toggle + panel (visible once connected) -->
-    <div id="partyChatToggle" class="hidden fixed bottom-6 left-6 z-[65]">
-        <button onclick="togglePartyChat()" class="relative bg-netflixRed hover:bg-red-700 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-xl transition">
-            <i class="fa-solid fa-comments"></i>
+    <div id="partyChatToggle" class="hidden fixed top-[76px] right-5 z-[85]">
+        <button onclick="togglePartyChat()" class="relative bg-netflixRed hover:bg-red-700 rounded-lg shadow-2xl flex items-center justify-center transition">
+            <i class="fa-solid fa-comments"></i><span class="chat-label">Chat</span>
             <span id="partyChatBadge" class="hidden absolute -top-1 -right-1 bg-white text-netflixRed text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">0</span>
         </button>
     </div>
 
-    <div id="partyChatPanel" class="hidden fixed bottom-24 left-6 z-40 w-80 max-w-[90vw] bg-netflixCard border border-zinc-700 rounded-lg shadow-2xl flex-col overflow-hidden" style="height:420px;">
+    <div id="partyChatPanel" class="hidden fixed top-[140px] right-5 z-[84] w-80 max-w-[calc(100vw-2rem)] bg-netflixCard border border-zinc-700 rounded-lg shadow-2xl flex-col overflow-hidden" style="height:min(520px,calc(100vh - 170px));">
         <div class="bg-zinc-900 px-4 py-3 flex items-center justify-between border-b border-zinc-800">
             <span class="font-semibold text-sm flex items-center gap-2"><i class="fa-solid fa-users text-netflixRed"></i> Party Chat <span id="partyChatCount" class="text-zinc-500 font-normal"></span></span>
             <button onclick="togglePartyChat()" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
@@ -315,35 +407,52 @@
     <!-- Floating reactions rise up from here, over whatever's on screen -->
     <div id="reactionLayer" class="fixed inset-0 z-[55] pointer-events-none overflow-hidden"></div>
 
-    <!-- Party Room: what you land on right after starting/joining a party -
-         pick a movie from your library on the left, chat lives permanently
-         on the right instead of floating over everything. -->
-    <div id="partyRoomScreen" class="hidden fixed inset-0 z-[45] bg-netflixDark flex-col">
-        <div class="flex items-center justify-between px-4 md:px-6 py-4 border-b border-zinc-800 bg-netflixDark/95 backdrop-blur-md flex-shrink-0">
-            <div class="flex items-center gap-3">
-                <button onclick="leavePartyRoomToLibrary()" title="Browse your full library" class="text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition">
-                    <i class="fa-solid fa-arrow-left text-lg"></i>
-                </button>
-                <div>
-                    <h2 class="text-lg md:text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-users text-netflixRed"></i> Watch Party</h2>
-                    <p class="text-xs text-zinc-500"><span id="partyRoomCode"></span> · <span id="partyRoomMemberCount">1</span> connected</p>
+    <!-- Party Room: the shared theatre lobby. Host controls playback; guests request titles. -->
+    <div id="partyRoomScreen" class="hidden fixed inset-0 z-[45] bg-[#0d0d0f] flex-col">
+        <div class="flex items-center justify-between px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-zinc-800 bg-black/60 backdrop-blur-xl flex-shrink-0">
+            <div class="flex items-center gap-3 min-w-0">
+                <button onclick="requestLeaveTheatre()" title="Exit theatre" class="text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition"><i class="fa-solid fa-arrow-left text-lg"></i></button>
+                <div class="min-w-0">
+                    <h2 class="text-lg md:text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-clapperboard text-netflixRed"></i> The Theatre <span id="partyRolePill" class="text-[10px] uppercase tracking-wider px-2 py-1 rounded-full bg-zinc-800 text-zinc-400">Guest</span></h2>
+                    <p class="text-xs text-zinc-500"><span id="partyRoomCode"></span> · <span id="partyRoomMemberCount">1</span> watching · <span id="partyRoomProfileName"></span></p>
                 </div>
             </div>
-            <button onclick="openPartyManageModal()" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-md text-xs font-semibold transition flex items-center gap-2">
-                <i class="fa-solid fa-gear"></i> Manage
-            </button>
-        </div>
-
-        <div class="flex-1 flex flex-col md:flex-row gap-4 p-4 md:p-6 overflow-hidden">
-            <div class="flex-1 flex flex-col overflow-hidden min-w-0">
-                <h3 class="text-sm font-semibold text-zinc-400 uppercase tracking-wide mb-3 flex-shrink-0">Pick something to watch together</h3>
-                <div id="partyMovieGrid" class="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 content-start pb-4"></div>
+            <div class="theatre-header-actions flex items-center gap-2 min-w-0">
+                <div id="partyChatHeaderSlot" class="flex items-center shrink-0"></div>
+                <button onclick="togglePartyAudit()" class="theatre-action bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-md text-xs font-semibold transition flex items-center gap-2"><i class="fa-solid fa-list-check"></i><span class="hidden sm:inline">Activity</span></button>
+                <button onclick="openPartyManageModal()" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-md text-xs font-semibold transition flex items-center gap-2"><i class="fa-solid fa-gear"></i><span class="hidden sm:inline">Party</span></button>
+                <button onclick="requestLeaveTheatre()" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-2 rounded-md text-xs font-semibold transition flex items-center gap-2"><i class="fa-solid fa-door-open"></i><span class="hidden sm:inline">Exit</span></button>
             </div>
-            <div id="partyRoomChatSlot" class="w-full md:w-96 flex-shrink-0 flex flex-col overflow-hidden" style="max-height:100%;"></div>
+        </div>
+        <div class="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_300px_320px] gap-3 p-3 sm:p-4 md:p-6 overflow-hidden theatre-content-grid">
+            <section class="min-w-0 min-h-0 flex flex-col">
+                <div class="flex items-end justify-between gap-3 mb-3 flex-shrink-0"><div><p class="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Your Library</p><h3 class="text-base font-semibold text-white">Choose a film</h3></div><span class="text-xs text-zinc-500">Files stay local</span></div>
+                <div id="partyMovieGrid" class="party-movie-grid flex-1 min-h-0 overflow-y-auto grid gap-4 content-start pb-4 pr-1"></div>
+            </section>
+            <aside class="min-h-0 bg-[#151518] border border-zinc-800 rounded-xl overflow-hidden flex flex-col">
+                <div class="px-4 py-3 border-b border-zinc-800"><p class="text-[10px] uppercase tracking-[0.25em] text-zinc-500">The Queue</p><h3 class="font-semibold">Requests & Up Next</h3></div>
+                <div id="partyQueueList" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
+                <div class="px-3 py-2 border-t border-zinc-800 text-[11px] text-zinc-500">Guests request. Host decides what plays.</div>
+            </aside>
+            <aside id="partyRoomChatSlot" class="min-h-0 flex flex-col overflow-hidden xl:col-span-1"></aside>
+        </div>
+        <div id="partyAuditPanel" class="hidden absolute top-16 right-4 md:right-6 w-[min(390px,calc(100vw-2rem))] max-h-[55vh] z-20 bg-[#151518]/98 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-zinc-800 flex items-center justify-between"><div><p class="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Quiet Log</p><h3 class="font-semibold">Party Activity</h3></div><button onclick="togglePartyAudit()" class="text-zinc-500 hover:text-white"><i class="fa-solid fa-xmark"></i></button></div>
+            <div id="partyAuditList" class="p-3 max-h-[45vh] overflow-y-auto space-y-2 text-xs"></div>
         </div>
     </div>
 
     <div id="playerModal" class="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl hidden flex-col justify-center items-center">
+        <div id="playerPartyChatDock" class="hidden absolute top-0 right-0 bottom-0 w-[340px] z-[35] bg-[#171717]/98 border-l border-zinc-800 shadow-2xl">
+            <div id="playerPartyChatSlot" class="h-full w-full"></div>
+        </div>
+        <div id="partyCountdownOverlay" class="hidden absolute inset-0 z-[90] pointer-events-none flex-col items-center justify-center bg-[#050505]">
+            <div class="text-center">
+                <div class="text-[11px] uppercase tracking-[0.35em] text-zinc-300 mb-3">Up next</div>
+                <div id="partyCountdownNumber" class="text-[7rem] md:text-[10rem] leading-none font-black text-white drop-shadow-2xl">4</div>
+                <div id="partyCountdownTitle" class="mt-2 text-lg md:text-2xl font-semibold text-white max-w-[70vw] truncate"></div>
+            </div>
+        </div>
         <!-- Top Title & Subtitle Toolbar -->
         <div class="absolute top-0 left-0 right-0 p-4 flex justify-between items-center bg-gradient-to-b from-black/90 to-transparent z-20 transition opacity-90 hover:opacity-100" id="playerTopBar">
             <div class="flex items-center space-x-3">
@@ -353,6 +462,7 @@
                 <h3 id="modalMovieTitle" class="text-base md:text-xl font-bold truncate max-w-xs md:max-w-xl">Movie Title</h3>
             </div>
             <div class="flex items-center space-x-2 md:space-x-3">
+                <div id="playerChatToggleSlot" class="flex items-center"></div>
                 <!-- Audio Track Selector (shown only when a file has multiple audio tracks) -->
                 <div id="audioTrackWrap" class="hidden items-center space-x-2 bg-zinc-900/90 border border-zinc-700/80 px-3 py-1.5 rounded-md">
                     <i class="fa-solid fa-headphones text-netflixRed"></i>
@@ -369,9 +479,6 @@
                         <input type="file" id="subtitleInput" accept=".srt,.vtt" class="hidden">
                     </label>
                 </div>
-                <button onclick="togglePartyChat()" id="playerPartyChatBtn" title="Party Chat" class="hidden relative z-[25] text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition">
-                    <i class="fa-solid fa-comments text-lg"></i>
-                </button>
                 <button onclick="toggleFullscreen()" class="text-zinc-300 hover:text-white bg-zinc-800/80 hover:bg-zinc-700 p-2.5 rounded-full transition" title="Toggle Fullscreen">
                     <i id="fullscreenIcon" class="fa-solid fa-expand text-lg"></i>
                 </button>
@@ -381,8 +488,6 @@
         <!-- Video Container -->
         <div class="relative w-full h-full flex items-center justify-center cursor-pointer" id="videoContainer">
             <video id="videoPlayer" class="max-w-full max-h-full object-contain" crossorigin="anonymous" playsinline autoplay></video>
-                Your browser does not support the video tag.
-            </video>
             <!-- Shown while the file is loading, hidden as soon as it's ready or errors out -->
             <div id="playerLoadingIndicator" class="hidden absolute inset-0 flex-col items-center justify-center gap-3 text-zinc-400 bg-black/40 z-10 pointer-events-none">
                 <i class="fa-solid fa-circle-notch fa-spin text-4xl text-netflixRed"></i>
@@ -401,19 +506,19 @@
             <!-- Scrubbing Progress Bar -->
             <div class="flex items-center gap-3">
                 <span id="currentTimeDisplay" class="text-xs text-zinc-400 font-mono w-12 text-right">00:00</span>
-                <input type="range" id="progressBar" value="0" min="0" max="100" step="0.1" class="av-range w-full h-2 rounded-lg cursor-pointer">
+                <input type="range" id="progressBar" value="0" min="0" max="100" step="0.1" class="host-only-control av-range w-full h-2 rounded-lg cursor-pointer">
                 <span id="durationDisplay" class="text-xs text-zinc-400 font-mono w-12">00:00</span>
             </div>
 
             <div class="flex items-center justify-between pt-1">
                 <div class="flex items-center space-x-4 md:space-x-5">
-                    <button id="playPauseBtn" class="text-white hover:text-netflixRed transition text-xl" title="Play/Pause">
+                    <button id="playPauseBtn" class="host-only-control text-white hover:text-netflixRed transition text-xl" title="Play/Pause">
                         <i class="fa-solid fa-play" id="playPauseIcon"></i>
                     </button>
-                    <button onclick="skipTime(-10)" class="text-zinc-400 hover:text-white transition text-lg" title="Rewind 10s">
+                    <button onclick="skipTime(-10)" class="host-only-control text-zinc-400 hover:text-white transition text-lg" title="Rewind 10s">
                         <i class="fa-solid fa-rotate-left"></i>
                     </button>
-                    <button onclick="skipTime(10)" class="text-zinc-400 hover:text-white transition text-lg" title="Forward 10s">
+                    <button onclick="skipTime(10)" class="host-only-control text-zinc-400 hover:text-white transition text-lg" title="Forward 10s">
                         <i class="fa-solid fa-rotate-right"></i>
                     </button>
                     <div class="flex items-center space-x-2">
@@ -425,7 +530,7 @@
                 </div>
 
                 <div class="flex items-center space-x-3 text-xs md:text-sm">
-                    <div class="flex items-center space-x-1.5 bg-zinc-800/90 border border-zinc-700/80 rounded px-2.5 py-1">
+                    <div class="host-only-control flex items-center space-x-1.5 bg-zinc-800/90 border border-zinc-700/80 rounded px-2.5 py-1">
                         <span class="text-zinc-400">Speed:</span>
                         <select id="playbackSpeed" class="bg-transparent text-white border-none cursor-pointer outline-none text-xs">
                             <option value="0.5">0.5x</option>
@@ -441,10 +546,29 @@
         </div>
     </div>
 
+    <!-- App confirmation dialog: never use browser alert/confirm for theatre exits. -->
+    <div id="appConfirm" class="hidden fixed inset-0 z-[120] items-center justify-center p-4 party-confirm-backdrop bg-black/70">
+        <div class="w-full max-w-md bg-[#18181b] border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-zinc-800">
+                <p id="appConfirmEyebrow" class="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Confirm action</p>
+                <h3 id="appConfirmTitle" class="text-lg font-bold mt-1">Leave?</h3>
+            </div>
+            <div class="px-5 py-5">
+                <p id="appConfirmMessage" class="text-sm text-zinc-300 leading-relaxed">Are you sure?</p>
+            </div>
+            <div class="px-5 py-4 bg-black/20 border-t border-zinc-800 flex justify-end gap-2">
+                <button id="appConfirmCancel" class="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-sm font-semibold">Cancel</button>
+                <button id="appConfirmOk" class="px-4 py-2 rounded-lg bg-netflixRed hover:bg-red-700 text-sm font-semibold">Continue</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let movies = [];
         let currentMovieIndex = null;
+        let isPartyMovieSession = false; // Party queue playback never touches local watch history.
         let watchHistory = JSON.parse(localStorage.getItem('netflix_watch_history') || '{}');
+        let appConfirmAction = null;
 
         const folderInput = document.getElementById('folderInput');
         const filesInput = document.getElementById('filesInput');
@@ -457,7 +581,7 @@
 
         // Player DOM
         const playerModal = document.getElementById('playerModal');
-        const videoPlayer = document.getElementById('videoPlayer');
+        let videoPlayer = document.getElementById('videoPlayer');
         const videoContainer = document.getElementById('videoContainer');
         const modalMovieTitle = document.getElementById('modalMovieTitle');
         const playPauseBtn = document.getElementById('playPauseBtn');
@@ -480,8 +604,15 @@
         const playerControls = document.getElementById('playerControls');
 
         let currentObjectURL = null;     // tracks the active blob: URL so we can revoke it (memory-leak fix)
-        let embeddedSubtitleTracks = {}; // mkv track number -> native TextTrack, for the current movie
-        let playerLoadWatchdog = null;   // catches the "loads forever, never errors, never plays" case
+        let embeddedSubtitleTracks = {};
+        // Tracks created with addTextTrack() cannot reliably be removed from the
+        // media element. Keep references so old embedded tracks never leak into
+        // the subtitle menu for a later movie.
+        let staleEmbeddedSubtitleTracks = new Set();
+        let activeMkvReader = null;
+        let mkvScanToken = 0; // mkv track number -> native TextTrack, for the current movie
+        let playerLoadWatchdog = null;
+        let progressDragging = false;   // catches the "loads forever, never errors, never plays" case
 
         // Drag & Drop handlers
         window.addEventListener('dragover', (e) => e.preventDefault());
@@ -506,11 +637,15 @@
                 return;
             }
 
-            movies = videoFiles.map((file, index) => {
+            const existingKeys = new Set(movies.map(m => `${m.name}|${m.size}|${m.lastModified}`));
+            const newMovies = videoFiles.filter(file => {
+                const key = `${file.name}|${file.size}|${file.lastModified || 0}`;
+                return !existingKeys.has(key);
+            }).map((file, newIndex) => {
                 const cleanName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
                 const ext = file.name.split('.').pop().toLowerCase();
                 return {
-                    id: index,
+                    id: movies.length + newIndex,
                     file: file,
                     name: file.name,
                     cleanName: cleanName,
@@ -523,6 +658,9 @@
                     currentTime: watchHistory[file.name]?.currentTime || 0
                 };
             });
+            movies.push(...newMovies);
+            folderInput.value = '';
+            filesInput.value = '';
 
             loadBadge.textContent = `${movies.length} movies loaded`;
             loadBadge.classList.remove('hidden');
@@ -568,6 +706,7 @@
                         const durSpan = document.getElementById(`dur-${idx}`);
                         if (durSpan && movie.duration) {
                             durSpan.textContent = formatDuration(movie.duration);
+                            durSpan.classList.remove('hidden');
                         }
                     } catch (e) {
                         console.log('Thumbnail extraction skipped for CORS/codec restriction', e);
@@ -672,11 +811,9 @@
                     <div class="absolute top-2 right-2 z-20 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-mono text-zinc-300">
                         ${formatBytes(movie.size)}
                     </div>
-                    ${movie.duration ? `
-                        <div class="absolute bottom-2 right-2 z-20 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-mono text-zinc-300" id="dur-${originalIndex}">
-                            ${formatDuration(movie.duration)}
-                        </div>
-                    ` : ''}
+                    <div class="absolute bottom-2 right-2 z-20 bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-mono text-zinc-300 ${movie.duration ? '' : 'hidden'}" id="dur-${originalIndex}">
+                        ${movie.duration ? formatDuration(movie.duration) : ''}
+                    </div>
                     <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300 z-20 bg-black/40">
                         <div class="w-12 h-12 bg-netflixRed text-white rounded-full flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition">
                             <i class="fa-solid fa-play ml-0.5"></i>
@@ -692,8 +829,8 @@
                 const infoDiv = document.createElement('div');
                 infoDiv.className = 'p-3.5 flex flex-col justify-between flex-1 bg-netflixCard';
                 infoDiv.innerHTML = `
-                    <h3 class="text-sm font-medium text-white line-clamp-2 leading-snug group-hover:text-netflixRed transition" title="${movie.cleanName}">
-                        ${movie.cleanName}
+                    <h3 class="text-sm font-medium text-white line-clamp-2 leading-snug group-hover:text-netflixRed transition" title="${escapeHtml(movie.cleanName)}">
+                        ${escapeHtml(movie.cleanName)}
                     </h3>
                     <div class="flex items-center justify-between mt-3 text-[11px] text-zinc-400">
                         <span>${new Date(movie.lastModified).toLocaleDateString()}</span>
@@ -708,16 +845,35 @@
         }
 
         // Video Player Open / Close & Subtitle Inbuilt Scanner
-        function openPlayer(index) {
+        function openPlayer(index, options = {}) {
+            if (isPartyHost && partyCode && !playerModal.classList.contains('hidden')) closePartyMediaCalls();
+            setPartyChatToggleLocation(!!partyCode);
             currentMovieIndex = index;
+            isPartyMovieSession = !!options.partyCountdown;
+            remotePartyPlayback = false;
+            playerHostOnlyMode(false);
+            playerModal.classList.remove('party-remote');
+            const partyDock = document.getElementById('playerPartyChatDock');
+            const chatWasClosed = partyChatPanel.classList.contains('hidden');
+            partyDock.classList.toggle('hidden', !partyCode || chatWasClosed);
+            partyDock.classList.toggle('flex', !!partyCode && !chatWasClosed);
+            playerModal.classList.toggle('party-docked', !!partyCode && !chatWasClosed);
+            if (partyCode && !chatWasClosed) setChatPanelMode('player'); else if (partyCode) setChatPanelMode('floating');
             const movie = movies[index];
             modalMovieTitle.textContent = movie.cleanName;
 
-            // --- Bug fix: previously, <track> elements (inbuilt + any externally
-            // uploaded subtitle) from the LAST movie were never removed, so opening
-            // a second movie left stale/duplicate tracks attached to <video>, which
-            // could scramble subtitle indices. Wipe them before loading the new file. ---
-            Array.from(videoPlayer.querySelectorAll('track')).forEach(t => t.remove());
+            // Cancel any previous MKV subtitle scan before switching media.
+            mkvScanToken++;
+            if (activeMkvReader) { try { activeMkvReader.cancel(); } catch (e) {} activeMkvReader = null; }
+            // Remove external DOM-backed subtitle tracks. Native addTextTrack tracks
+            // are hidden and ignored by the menu on subsequent movies.
+            Array.from(videoPlayer.querySelectorAll('track')).forEach(t => { try { t.remove(); } catch (e) {} });
+            if (videoPlayer.textTracks) {
+                for (let i = 0; i < videoPlayer.textTracks.length; i++) {
+                    const oldTrack = videoPlayer.textTracks[i];
+                    if (oldTrack && oldTrack.__lmsEmbedded) staleEmbeddedSubtitleTracks.add(oldTrack);
+                }
+            }
             embeddedSubtitleTracks = {};
 
             // --- Bug fix: the previous blob: URL was never revoked, leaking memory
@@ -738,7 +894,7 @@
                 if (videoPlayer.readyState === 0) {
                     loadingIndicator.classList.add('hidden');
                     loadingIndicator.classList.remove('flex');
-                    errorBanner.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-3xl text-netflixRed mb-1"></i><p class="font-semibold">Still not loading</p><p class="text-sm text-zinc-400">This usually means your browser can't decode this file's codec. Try converting it to MP4 (H.264/AAC), or play it in VLC instead.</p>`;
+                    errorBanner.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-3xl text-netflixRed mb-1"></i><p class="font-semibold">Still not loading</p><p class="text-sm text-zinc-400 max-w-xl">This usually means your browser can't decode this file's codec. Try converting it to MP4 (H.264/AAC), or play it in VLC instead.</p><button onclick="closePlayerNow()" class="mt-3 bg-netflixRed hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-semibold">Back to Library</button>`;
                     errorBanner.classList.remove('hidden');
                     errorBanner.classList.add('flex');
                 }
@@ -767,6 +923,7 @@
                 if (videoPlayer.textTracks && videoPlayer.textTracks.length > 0) {
                     for (let i = 0; i < videoPlayer.textTracks.length; i++) {
                         const track = videoPlayer.textTracks[i];
+                        if (staleEmbeddedSubtitleTracks.has(track)) { track.mode = 'hidden'; continue; }
                         track.mode = 'hidden';
                         const opt = document.createElement('option');
                         opt.value = i;
@@ -779,20 +936,30 @@
                 // where the browser exposes it (Chrome/Edge desktop today).
                 populateAudioTracks();
 
-                if (movie.currentTime > 5 && movie.currentTime < videoPlayer.duration - 5) {
+                // Local resume belongs only to normal offline playback. A Watch Party
+                // screening always starts from the beginning, even if this movie was
+                // watched locally to 30 minutes (or further) earlier.
+                if (!isPartyMovieSession && movie.currentTime > 5 && movie.currentTime < videoPlayer.duration - 5) {
                     videoPlayer.currentTime = movie.currentTime;
+                } else if (isPartyMovieSession) {
+                    videoPlayer.currentTime = 0;
                 }
                 // Bug fix: the play icon used to flip to "pause" immediately, even if
                 // play() actually failed (e.g. autoplay blocked) - so a video that
                 // silently didn't start still looked like it was playing.
-                videoPlayer.play().then(() => {
-                    updatePlayState(true);
-                    if (isPartyHost) setTimeout(callAllGuestsWithVideo, 100);
-                }).catch(err => {
-                    console.log("Autoplay restriction prevented auto-start:", err);
+                if (options.deferAutoplay || (options.partyCountdown && isPartyHost)) {
                     updatePlayState(false);
-                    showNotification('Your browser blocked autoplay - press play to start.');
-                });
+                    if (isPartyHost && isPartyMovieSession) setTimeout(callAllGuestsWithVideo, 150);
+                } else {
+                    videoPlayer.play().then(() => {
+                        updatePlayState(true);
+                        if (isPartyHost && isPartyMovieSession) setTimeout(callAllGuestsWithVideo, 150);
+                    }).catch(err => {
+                        console.log("Autoplay restriction prevented auto-start:", err);
+                        updatePlayState(false);
+                        if (partyCode) addPartyAudit('Playback could not start automatically; host can press Play.', 'warn'); else showNotification('Your browser blocked autoplay - press play to start.');
+                    });
+                }
             };
 
             // Browsers never expose subtitles/audio muxed INSIDE an .mkv container
@@ -810,8 +977,27 @@
         }
 
         function closePlayer() {
+            if (playerModal.classList.contains('hidden')) return;
+            const action = () => closePlayerNow();
+            if (remotePartyPlayback) {
+                openAppConfirm('Leave the screening?', 'The video will stop for you and you will return to the theatre. The watch party itself will continue.', action, 'Leave movie');
+            } else {
+                openAppConfirm('Close the player?', 'Your current position will be saved on this device before returning to the library or theatre.', action, 'Close player');
+            }
+        }
+
+        function closePlayerNow() {
             clearTimeout(playerLoadWatchdog);
-            if (currentMovieIndex !== null) {
+            clearTimeout(controlsHideTimer);
+            controlsHideTimer = null;
+            mkvScanToken++;
+            if (activeMkvReader) { try { activeMkvReader.cancel(); } catch (e) {} activeMkvReader = null; }
+            clearInterval(partyCountdownTimer);
+            partyCountdownTimer = null;
+            partyCountdownActive = false;
+            const overlay = document.getElementById('partyCountdownOverlay');
+            overlay.classList.add('hidden'); overlay.classList.remove('flex');
+            if (currentMovieIndex !== null && !isPartyMovieSession && !remotePartyPlayback) {
                 const movie = movies[currentMovieIndex];
                 watchHistory[movie.name] = {
                     currentTime: videoPlayer.currentTime,
@@ -822,29 +1008,39 @@
                 movie.progress = watchHistory[movie.name].progress;
                 renderGrid();
             }
-
+            if (isPartyHost && partyCode) closePartyMediaCalls();
             videoPlayer.pause();
-            videoPlayer.src = '';
+            videoPlayer.removeAttribute('src');
             videoPlayer.srcObject = null;
             videoPlayer.muted = false;
+            videoPlayer.autoplay = true;
             remotePartyPlayback = false;
+            playerHostOnlyMode(false);
+            playerModal.classList.remove('party-remote', 'party-docked');
+            document.getElementById('playerPartyChatDock').classList.add('hidden');
+            document.getElementById('playerPartyChatDock').classList.remove('flex');
             pendingPartyStream = null;
-            if (currentObjectURL) {
-                URL.revokeObjectURL(currentObjectURL);
-                currentObjectURL = null;
-            }
+            if (currentObjectURL) { URL.revokeObjectURL(currentObjectURL); currentObjectURL = null; }
             playerModal.classList.remove('flex');
             playerModal.classList.add('hidden');
+            currentMovieIndex = null;
+            isPartyMovieSession = false;
+            if (screen.orientation && typeof screen.orientation.unlock === 'function') screen.orientation.unlock();
+            if (partyCode) enterPartyRoom();
+            else setPartyChatToggleLocation(false);
+        }
 
-            if (screen.orientation && typeof screen.orientation.unlock === 'function') {
-                screen.orientation.unlock();
-            }
+        function requestLeaveTheatre() {
+            if (!partyCode) return;
+            openAppConfirm(isPartyHost ? 'End this theatre?' : 'Leave this theatre?',
+                isPartyHost ? 'The party will end for everyone connected to you.' : 'You will leave the party and return to your local library.',
+                () => { if (isPartyHost) leavePartyNow(); else leavePartyNow(); },
+                isPartyHost ? 'End theatre' : 'Leave theatre');
+        }
 
-            // If a watch party is still running, land back in the Party Room
-            // (movie picker + chat) instead of the bare library.
-            if (partyCode) {
-                enterPartyRoom();
-            }
+        function playerHostOnlyMode(isRemote) {
+            const partyGuestScreening = !!partyCode && !isPartyHost && !!isPartyMovieSession;
+            document.querySelectorAll('#playerModal .host-only-control').forEach(el => el.classList.toggle('hidden', isRemote || partyGuestScreening));
         }
 
         // --- Auto-hide overlay controls during playback ---
@@ -901,10 +1097,10 @@
                 }
             }
             const errorBanner = document.getElementById('playerErrorBanner');
-            errorBanner.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-3xl text-netflixRed mb-1"></i><p class="font-semibold">Can't play this file</p><p class="text-sm text-zinc-400">${reason}</p>`;
+            errorBanner.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-3xl text-netflixRed mb-1"></i><p class="font-semibold">Can't play this file</p><p class="text-sm text-zinc-400 max-w-xl">${reason}</p><button onclick="closePlayerNow()" class="mt-3 bg-netflixRed hover:bg-red-700 px-4 py-2 rounded-lg text-sm font-semibold">Back to Library</button>`;
             errorBanner.classList.remove('hidden');
             errorBanner.classList.add('flex');
-            showNotification(reason, 'error');
+            if (partyCode) addPartyAudit(reason, 'warn'); else showNotification(reason, 'error');
             updatePlayState(false);
         });
 
@@ -934,18 +1130,35 @@
         });
 
         function clearHistory() {
-            if (confirm('Clear all watch history and progress?')) {
+            openAppConfirm('Clear watch history', 'This removes saved playback progress from this device. Your movie files are not deleted.', () => {
                 localStorage.removeItem('netflix_watch_history');
                 watchHistory = {};
                 movies.forEach(m => { m.progress = 0; m.currentTime = 0; });
                 renderGrid();
                 showNotification('Watch history cleared successfully.', 'success');
-            }
+            }, 'Clear history');
         }
+
+        function openAppConfirm(title, message, action, okLabel='Continue') {
+            appConfirmAction = typeof action === 'function' ? action : null;
+            document.getElementById('appConfirmTitle').textContent = title;
+            document.getElementById('appConfirmMessage').textContent = message;
+            document.getElementById('appConfirmOk').textContent = okLabel;
+            const el = document.getElementById('appConfirm');
+            el.classList.remove('hidden'); el.classList.add('flex');
+        }
+        function closeAppConfirm() {
+            const el = document.getElementById('appConfirm');
+            el.classList.add('hidden'); el.classList.remove('flex');
+            appConfirmAction = null;
+        }
+        document.getElementById('appConfirmCancel').addEventListener('click', closeAppConfirm);
+        document.getElementById('appConfirmOk').addEventListener('click', () => { const action = appConfirmAction; closeAppConfirm(); if (action) action(); });
+        document.getElementById('appConfirm').addEventListener('click', e => { if (e.target.id === 'appConfirm') closeAppConfirm(); });
 
         function showNotification(msg, type = 'success') {
             const div = document.createElement('div');
-            div.className = `fixed bottom-6 right-6 z-50 px-4 py-3 rounded-md shadow-2xl text-sm font-medium text-white flex items-center gap-2 transition duration-300 ${type === 'error' ? 'bg-netflixRed' : 'bg-zinc-800 border border-zinc-700'}`;
+            div.className = `fixed bottom-6 right-6 z-[130] px-4 py-3 rounded-md shadow-2xl text-sm font-medium text-white flex items-center gap-2 transition duration-300 ${type === 'error' ? 'bg-netflixRed' : 'bg-zinc-800 border border-zinc-700'}`;
             div.innerHTML = `<i class="fa-solid ${type === 'error' ? 'fa-triangle-exclamation text-white' : 'fa-circle-check text-green-500'}"></i> ${msg}`;
             document.body.appendChild(div);
             setTimeout(() => {
@@ -953,6 +1166,11 @@
                 setTimeout(() => div.remove(), 300);
             }, 3000);
         }
+
+        // LMS never uses blocking browser dialogs. Keep this defensive shim so a
+        // future helper or third-party parser cannot freeze the movie UI with a
+        // native alert; route it into the same non-blocking notification system.
+        window.alert = (msg) => showNotification(String(msg || 'Something happened.'), 'error');
 
         // Convert SRT subtitle text into valid WebVTT. Bug fix: the HTML5 <track>
         // element only understands WebVTT - it will silently show nothing for a
@@ -1014,10 +1232,12 @@
         subtitlesMenu.addEventListener('change', (e) => {
             const val = e.target.value;
             for (let i = 0; i < videoPlayer.textTracks.length; i++) {
+                const track = videoPlayer.textTracks[i];
+                if (staleEmbeddedSubtitleTracks.has(track)) { track.mode = 'hidden'; continue; }
                 if (val === 'off') {
-                    videoPlayer.textTracks[i].mode = 'hidden';
+                    track.mode = 'hidden';
                 } else {
-                    videoPlayer.textTracks[i].mode = (i == val) ? 'showing' : 'hidden';
+                    track.mode = (i == val) ? 'showing' : 'hidden';
                 }
             }
         });
@@ -1055,6 +1275,8 @@
                 if (!tracks || tracks.length === 0) return;
                 tracks.forEach((t) => {
                     const tt = videoPlayer.addTextTrack('subtitles', t.name || t.language || `Embedded ${t.number}`, t.language || '');
+                    tt.__lmsEmbedded = true;
+                    staleEmbeddedSubtitleTracks.delete(tt);
                     tt.mode = 'hidden';
                     trackNumberToTextTrack[t.number] = tt;
 
@@ -1079,15 +1301,19 @@
                 }
             });
 
-            // Stream the file into the parser in chunks rather than loading the
-            // whole (potentially multi-GB) file into memory at once.
+            // Stream the file into the parser in chunks, but make the reader cancellable
+            // when the movie changes/closes.
+            const scanToken = ++mkvScanToken;
             const reader = movie.file.stream().getReader();
+            activeMkvReader = reader;
             (function pump() {
+                if (scanToken !== mkvScanToken) { try { reader.cancel(); } catch (e) {} return; }
                 reader.read().then(({ done, value }) => {
-                    if (done) { try { parser.end && parser.end(); } catch (e) {} return; }
-                    try { parser.write(value); } catch (err) { console.warn('MKV parse stopped:', err); return; }
+                    if (scanToken !== mkvScanToken) { try { reader.cancel(); } catch (e) {} return; }
+                    if (done) { activeMkvReader = null; try { parser.end && parser.end(); } catch (e) {} return; }
+                    try { parser.write(value); } catch (err) { activeMkvReader = null; console.warn('MKV parse stopped:', err); return; }
                     pump();
-                }).catch((err) => console.warn('MKV subtitle scan stopped:', err));
+                }).catch((err) => { activeMkvReader = null; if (scanToken === mkvScanToken) console.warn('MKV subtitle scan stopped:', err); });
             })();
         }
 
@@ -1113,7 +1339,14 @@
         }
 
         videoPlayer.addEventListener('timeupdate', () => {
-            if (!isNaN(videoPlayer.duration)) {
+            if (progressDragging) return;
+            if (remotePartyPlayback && !isPartyHost) {
+                currentTimeDisplay.textContent = 'LIVE';
+                durationDisplay.textContent = 'LIVE';
+                progressBar.value = 0;
+                return;
+            }
+            if (Number.isFinite(videoPlayer.duration) && videoPlayer.duration > 0) {
                 const percent = (videoPlayer.currentTime / videoPlayer.duration) * 100;
                 progressBar.value = percent;
                 updateRangeFill(progressBar);
@@ -1123,6 +1356,7 @@
         });
 
         progressBar.addEventListener('input', (e) => {
+            if (remotePartyPlayback && !isPartyHost) return;
             updateRangeFill(progressBar);
             if (!isNaN(videoPlayer.duration)) {
                 const time = (e.target.value / 100) * videoPlayer.duration;
@@ -1130,15 +1364,46 @@
             }
         });
 
+        progressBar.addEventListener('pointerdown', (e) => {
+            progressDragging = true;
+            try { progressBar.setPointerCapture(e.pointerId); } catch (_) {}
+        });
+        progressBar.addEventListener('pointerup', (e) => {
+            progressDragging = false;
+            try { progressBar.releasePointerCapture(e.pointerId); } catch (_) {}
+        });
+        progressBar.addEventListener('pointercancel', (e) => {
+            progressDragging = false;
+            try { progressBar.releasePointerCapture(e.pointerId); } catch (_) {}
+        });
+        window.addEventListener('pointerup', () => { progressDragging = false; });
+        window.addEventListener('blur', () => { progressDragging = false; });
+        // Native media events are the source of truth. This catches Spacebar,
+        // clicking the video, media keys, Bluetooth interruptions, and 10s skips
+        // instead of relying only on our custom buttons.
+        videoPlayer.addEventListener('play', () => {
+            updatePlayState(true);
+            if (isPartyHost && isPartyMovieSession && !applyingRemoteSync) setTimeout(broadcastSync, 0);
+        });
+        videoPlayer.addEventListener('pause', () => {
+            updatePlayState(false);
+            if (isPartyHost && isPartyMovieSession && !applyingRemoteSync) setTimeout(broadcastSync, 0);
+        });
+        videoPlayer.addEventListener('seeked', () => {
+            if (isPartyHost && isPartyMovieSession && !applyingRemoteSync) setTimeout(broadcastSync, 0);
+        });
         playPauseBtn.addEventListener('click', togglePlay);
         videoContainer.addEventListener('click', (e) => {
             if (e.target === videoContainer || e.target === videoPlayer) {
+                if (playerControls.classList.contains('controls-hidden') || playerTopBar.classList.contains('controls-hidden')) { showControls(); return; }
                 togglePlay();
                 showPlayIndicator();
             }
         });
 
         function togglePlay() {
+            if (remotePartyPlayback && !isPartyHost) return;
+            if (partyCountdownActive) return;
             if (videoPlayer.paused) {
                 videoPlayer.play();
                 updatePlayState(true);
@@ -1161,11 +1426,17 @@
         }
 
         function skipTime(seconds) {
+            if (remotePartyPlayback && !isPartyHost) return;
             videoPlayer.currentTime += seconds;
         }
 
         muteBtn.addEventListener('click', () => {
-            videoPlayer.muted = !videoPlayer.muted;
+            if (videoPlayer.muted || videoPlayer.volume === 0) {
+                videoPlayer.muted = false;
+                if (videoPlayer.volume === 0) videoPlayer.volume = 0.5;
+            } else {
+                videoPlayer.muted = true;
+            }
             volumeIcon.className = videoPlayer.muted || videoPlayer.volume === 0 ? "fa-solid fa-volume-xmark text-netflixRed" : "fa-solid fa-volume-high";
             volumeBar.value = videoPlayer.muted ? 0 : videoPlayer.volume;
             updateRangeFill(volumeBar);
@@ -1186,6 +1457,10 @@
             videoPlayer.playbackRate = parseFloat(e.target.value);
         });
 
+        document.addEventListener('fullscreenchange', () => {
+            fullscreenIcon.className = document.fullscreenElement ? "fa-solid fa-compress text-lg" : "fa-solid fa-expand text-lg";
+        });
+
         function toggleFullscreen() {
             if (!document.fullscreenElement) {
                 playerModal.requestFullscreen().catch(err => console.log(err));
@@ -1198,7 +1473,12 @@
 
         // Keyboard Shortcuts
         window.addEventListener('keydown', (e) => {
+            if (!document.getElementById('appConfirm').classList.contains('hidden')) { if (e.code === 'Escape') { e.preventDefault(); closeAppConfirm(); } else if (e.code === 'Enter') { e.preventDefault(); document.getElementById('appConfirmOk').click(); } return; }
             if (playerModal.classList.contains('hidden')) return;
+            const target = e.target;
+            const typing = target && (target.matches('input, textarea, select') || target.isContentEditable);
+            if (typing) return;
+            if (remotePartyPlayback && !isPartyHost && ['Space','ArrowRight','ArrowLeft','KeyF'].includes(e.code)) return;
 
             if (e.code === 'Space') {
                 e.preventDefault();
@@ -1227,7 +1507,7 @@
         const partyStatusBadge = document.getElementById('partyStatusBadge');
         const partyChatToggle = document.getElementById('partyChatToggle');
         const partyChatPanel = document.getElementById('partyChatPanel');
-        const playerPartyChatBtn = document.getElementById('playerPartyChatBtn');
+        const playerChatToggleSlot = document.getElementById('playerChatToggleSlot');
 
         let peer = null;
         let isPartyHost = false;
@@ -1237,11 +1517,38 @@
         const guestConnections = new Map(); // host-side: peerId -> { conn, name }
         let applyingRemoteSync = false;      // guard so applying a sync doesn't re-broadcast it
         let chatUnread = 0;
+        let partyProfileName = localStorage.getItem('lms_party_profile_name') || '';
+        let partyQueue = [];
+        let partyAudit = [];
+        let partyCountdownTimer = null;
+        let partyCountdownActive = false;
+        let partyCurrentTitle = '';
+        let partyHostPlaying = false;
         let pendingPartyStream = null;
         const partyMediaCalls = new Map();
         let remotePartyPlayback = false;
 
         const PARTY_PREFIX = 'localflix-party-';
+        const PARTY_PROFILE_KEY = 'lms_party_profile_name';
+
+        function savePartyProfileName() {
+            const input = document.getElementById('partyNameInput');
+            partyProfileName = (input?.value || partyProfileName || '').trim().slice(0, 20);
+            if (partyProfileName) localStorage.setItem(PARTY_PROFILE_KEY, partyProfileName);
+            return partyProfileName;
+        }
+
+        function addPartyAudit(text, kind='info') {
+            const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+            partyAudit.unshift({time, text, kind});
+            partyAudit = partyAudit.slice(0, 60);
+            const list = document.getElementById('partyAuditList');
+            if (list) list.innerHTML = partyAudit.map(x => `<div class="flex gap-2"><span class="text-zinc-600 font-mono shrink-0">${x.time}</span><span class="${x.kind==='good'?'text-zinc-200':x.kind==='warn'?'text-amber-300':'text-zinc-400'}">${escapeHtml(x.text)}</span></div>`).join('');
+        }
+        function togglePartyAudit() { document.getElementById('partyAuditPanel')?.classList.toggle('hidden'); }
+        const savedPartyNameInput = document.getElementById('partyNameInput');
+        if (savedPartyNameInput) { savedPartyNameInput.value = partyProfileName; savedPartyNameInput.addEventListener('blur', savePartyProfileName); savedPartyNameInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); createParty(); } }); }
+        document.getElementById('joinCodeInput')?.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); joinParty(); } });
 
         function randomPartyCode() {
             const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous-looking chars
@@ -1309,13 +1616,11 @@
             const stream = getPartyVideoStream();
             if (!stream) return;
             try {
-                const oldCall = partyMediaCalls.get(conn.peer);
-                if (oldCall) {
-                    try { oldCall.close(); } catch (e) {}
-                }
+                const existingCall = partyMediaCalls.get(conn.peer);
+                if (existingCall) { try { existingCall.close(); } catch (e) {} partyMediaCalls.delete(conn.peer); }
                 const call = peer.call(conn.peer, stream, { metadata: { type: 'watch-party-video' } });
                 partyMediaCalls.set(conn.peer, call);
-                call.on('error', err => console.warn('Party video call error:', err));
+                call.on('error', err => { console.warn('Party video call error:', err); if (partyMediaCalls.get(conn.peer) === call) partyMediaCalls.delete(conn.peer); });
                 call.on('close', () => {
                     if (partyMediaCalls.get(conn.peer) === call) partyMediaCalls.delete(conn.peer);
                 });
@@ -1337,13 +1642,19 @@
                     pendingPartyStream = stream;
                     if (remotePartyPlayback && !playerModal.classList.contains('hidden')) {
                         videoPlayer.src = '';
+                        videoPlayer.autoplay = false;
                         videoPlayer.srcObject = stream;
-                        videoPlayer.play().catch(err => {
-                            console.warn('Guest autoplay was blocked:', err);
-                            videoPlayer.muted = true;
-                            videoPlayer.play().catch(() => {});
-                            showNotification('Video connected. Click the video once to enable sound.');
-                        });
+                        if (partyHostPlaying) {
+                            videoPlayer.play().catch(err => {
+                                console.warn('Guest autoplay was blocked:', err);
+                                videoPlayer.muted = true;
+                                videoPlayer.play().catch(() => {});
+                                addPartyAudit('Video connected. Click the video to enable sound.', 'warn');
+                            });
+                        } else {
+                            videoPlayer.pause();
+                            updatePlayState(false);
+                        }
                     }
                 });
                 call.on('close', () => {
@@ -1359,7 +1670,16 @@
 
         function openRemotePartyPlayer(title, stream = null) {
             remotePartyPlayback = true;
+            isPartyMovieSession = true;
             currentMovieIndex = null;
+            playerModal.classList.add('party-remote', 'party-docked');
+            playerHostOnlyMode(true);
+            const dock = document.getElementById('playerPartyChatDock');
+            const chatWasClosed = partyChatPanel.classList.contains('hidden');
+            dock.classList.toggle('hidden', chatWasClosed);
+            dock.classList.toggle('flex', !chatWasClosed);
+            playerModal.classList.toggle('party-docked', !chatWasClosed);
+            if (!chatWasClosed) setChatPanelMode('player'); else setChatPanelMode('floating');
             modalMovieTitle.textContent = title || 'Watch Party';
             if (currentObjectURL) {
                 URL.revokeObjectURL(currentObjectURL);
@@ -1370,20 +1690,21 @@
             if (stream) pendingPartyStream = stream;
             if (pendingPartyStream) videoPlayer.srcObject = pendingPartyStream;
             videoPlayer.muted = false;
+            videoPlayer.autoplay = false;
             playerModal.classList.remove('hidden');
             playerModal.classList.add('flex', 'fade-in');
             showControls();
             document.getElementById('playerLoadingIndicator').classList.add('hidden');
             document.getElementById('playerLoadingIndicator').classList.remove('flex');
-            if (videoPlayer.srcObject) {
+            if (videoPlayer.srcObject && partyHostPlaying) {
                 videoPlayer.play().then(() => updatePlayState(true)).catch(err => {
                     console.warn('Guest remote autoplay blocked:', err);
                     videoPlayer.muted = true;
                     videoPlayer.play().then(() => updatePlayState(true)).catch(() => updatePlayState(false));
-                    showNotification('Video connected. Click the video to enable sound.');
+                    addPartyAudit('Video connected. Click the video to enable sound.', 'warn');
                 });
-            } else {
-                showNotification('Connected to the party. Waiting for the host video…');
+            } else if (!videoPlayer.srcObject) {
+                addPartyAudit('Waiting for the host video stream…', 'warn');
             }
         }
 
@@ -1394,7 +1715,8 @@
         }
 
         async function createParty() {
-            partyName = (document.getElementById('partyNameInput').value || 'Host').trim().slice(0, 20) || 'Host';
+            partyName = savePartyProfileName() || 'Host';
+            if (movies.length === 0) { showNotification('Load your movie folder before starting the theatre.', 'error'); return; }
             showPartyPane('partyConnecting');
             document.getElementById('partyConnectingText').textContent = 'Starting your watch party…';
             const code = randomPartyCode();
@@ -1402,11 +1724,13 @@
                 peer = await initPeer(PARTY_PREFIX + code);
                 isPartyHost = true;
                 partyCode = code;
+                partyQueue = []; partyAudit = []; renderPartyQueue();
                 peer.on('connection', (conn) => setupHostConnection(conn));
-                peer.on('disconnected', () => showNotification('Watch party connection dropped.', 'error'));
+                peer.on('disconnected', () => { if (partyCode) addPartyAudit('Watch party connection dropped.', 'warn'); else showNotification('Watch party connection dropped.', 'error'); });
                 showPartyActivePanel();
                 enterPartyRoom();
                 showNotification('Watch party started — share the link with others.', 'success');
+                addPartyAudit('Watch party started.', 'good');
             } catch (err) {
                 console.error(err);
                 showPartyPane('partyIdle');
@@ -1420,12 +1744,13 @@
         async function joinParty(codeArg) {
             const code = (codeArg || document.getElementById('joinCodeInput').value || '').trim().toUpperCase();
             if (!code) { showNotification('Enter a party code first.', 'error'); return; }
-            partyName = (document.getElementById('partyNameInput').value || 'Guest').trim().slice(0, 20) || 'Guest';
+            partyName = savePartyProfileName() || 'Guest';
             showPartyPane('partyConnecting');
             document.getElementById('partyConnectingText').textContent = 'Joining watch party…';
             try {
                 peer = await initPeer(null);
                 isPartyHost = false;
+                partyQueue = []; partyAudit = [];
                 enablePartyMediaReceiver();
                 const conn = peer.connect(PARTY_PREFIX + code, { reliable: true });
                 let settled = false;
@@ -1446,6 +1771,7 @@
                     showPartyActivePanel();
                     enterPartyRoom();
                     showNotification('Joined the watch party!', 'success');
+                    addPartyAudit('Joined the theatre.', 'good');
                 });
                 conn.on('error', (err) => {
                     if (settled) return;
@@ -1465,6 +1791,7 @@
             conn.on('open', () => {
                 guestConnections.set(conn.peer, { conn, name: 'Guest' });
                 updateMemberCount();
+                try { conn.send({type:'queue-state', queue:partyQueue}); } catch(e) {}
                 if (!playerModal.classList.contains('hidden')) {
                     setTimeout(() => callGuestWithVideo(conn), 150);
                 }
@@ -1488,8 +1815,12 @@
             conn.on('data', (data) => handlePartyData(data, conn));
             if (!isPartyHost) {
                 conn.on('close', () => {
-                    showNotification('The host ended the watch party.', 'error');
-                    resetPartyState();
+                    if (partyCode && !isPartyHost) {
+                        addPartyAudit('The host ended the watch party.', 'warn');
+                        if (!playerModal.classList.contains('hidden')) closePlayerNow();
+                        resetPartyState();
+                        showNotification('The host ended the theatre.', 'error');
+                    }
                 });
             }
         }
@@ -1512,6 +1843,62 @@
                 if (isPartyHost) broadcastToGuests(data, fromConn.peer); // relay to everyone else
                 return;
             }
+            if (data.type === 'party-ended') {
+                if (!isPartyHost) {
+                    addPartyAudit(data.reason || 'The host ended the theatre.', 'warn');
+                    if (!playerModal.classList.contains('hidden')) closePlayerNow();
+                    resetPartyState();
+                    showNotification('The host ended the theatre.', 'error');
+                }
+                return;
+            }
+            if (data.type === 'queue-request') {
+                if (isPartyHost && data.request) {
+                    partyQueue.push({...data.request, status:'pending'});
+                    renderPartyQueue();
+                    addPartyAudit(`${data.request.requester || 'Guest'} requested “${data.request.title}”`, 'good');
+                    addChatSystemMessage(`${data.request.requester || 'Guest'} requested “${data.request.title}”.`);
+                    broadcastQueueState();
+                }
+                return;
+            }
+            if (data.type === 'queue-update') {
+                if (!isPartyHost && data.request) {
+                    addPartyAudit(data.action === 'approved' ? `Host accepted “${data.request.title}”.` : `Host removed “${data.request.title}” from the queue.`, data.action === 'approved' ? 'good' : 'warn');
+                }
+                return;
+            }
+            if (data.type === 'queue-cancel') {
+                if (isPartyHost && data.requestId) {
+                    partyQueue = partyQueue.filter(q => q.id !== data.requestId); renderPartyQueue(); broadcastQueueState();
+                }
+                return;
+            }
+            if (data.type === 'party-start') {
+                if (!isPartyHost) {
+                    partyHostPlaying = true;
+                    startGuestRemotePlayback();
+                }
+                return;
+            }
+            if (data.type === 'party-state') {
+                if (!isPartyHost) {
+                    const count = Number(data.count) || 1;
+                    document.getElementById('partyMemberCount').textContent = count;
+                    document.getElementById('partyRoomMemberCount').textContent = count;
+                    document.getElementById('partyChatCount').textContent = `(${count})`;
+                }
+                return;
+            }
+            if (data.type === 'queue-state') {
+                partyQueue = Array.isArray(data.queue) ? data.queue : [];
+                renderPartyQueue();
+                return;
+            }
+            if (data.type === 'countdown') {
+                if (!isPartyHost) showGuestCountdown(data.title, data.seconds || 4);
+                return;
+            }
             if (data.type === 'sync') {
                 applyRemoteSync(data);
                 if (isPartyHost) broadcastToGuests(data, fromConn.peer);
@@ -1519,15 +1906,11 @@
             }
             if (data.type === 'movie-select') {
                 if (!isPartyHost) {
-                    // The guest does NOT need a local movie file. The host streams
-                    // the playing video element over WebRTC.
-                    partyRoomScreen.classList.add('hidden');
-                    partyRoomScreen.classList.remove('flex');
-                    setChatPanelMode('floating');
-                    openRemotePartyPlayer(data.title, pendingPartyStream);
-                    addChatSystemMessage(`Host is playing "${data.title}" — connecting to the host video…`);
+                    partyCurrentTitle = data.title || '';
+                    showGuestCountdown(data.title, data.countdown || 4, data.playAt);
+                    addPartyAudit(`Host selected “${data.title}”`, 'good');
                 } else {
-                    addChatSystemMessage(`Host is playing "${data.title}".`);
+                    addChatSystemMessage(`Host is playing “${data.title}”.`);
                     broadcastToGuests(data, fromConn.peer);
                 }
                 return;
@@ -1540,12 +1923,12 @@
         }
 
         // ---- Reactions: tiny, ephemeral P2P messages, never stored anywhere ----
-        const REACTION_EMOJIS = ['❤️', '😂', '🔥', '👏', '😮', '👍'];
+        const REACTION_EMOJIS = ['❤️', '😂', '🔥', '👏', '😮', '👍', '😍', '🎉', '💯', '🤯', '🥳', '😭', '🙌', '👀'];
         (function buildReactionBar() {
             const bar = document.getElementById('reactionBar');
             REACTION_EMOJIS.forEach(emoji => {
                 const btn = document.createElement('button');
-                btn.className = 'reaction-btn text-xl leading-none py-1 flex-1 rounded-md hover:bg-zinc-800 transition';
+                btn.className = 'reaction-btn text-xl leading-none rounded-md hover:bg-zinc-800 transition shrink-0';
                 btn.textContent = emoji;
                 btn.title = 'Send reaction';
                 btn.onclick = () => sendReaction(emoji);
@@ -1561,13 +1944,39 @@
 
         function spawnFloatingReaction(emoji) {
             const layer = document.getElementById('reactionLayer');
-            const el = document.createElement('span');
-            el.className = 'floating-reaction';
-            el.textContent = emoji || '❤️';
-            el.style.left = (8 + Math.random() * 70) + 'vw';
-            el.style.animationDuration = (2.2 + Math.random() * 0.8) + 's';
-            layer.appendChild(el);
-            el.addEventListener('animationend', () => el.remove());
+            const centerX = 18 + Math.random() * 64;
+            const centerY = 58 + Math.random() * 22;
+            const main = document.createElement('span');
+            main.className = 'floating-reaction';
+            main.textContent = emoji || '❤️';
+            main.style.left = centerX + 'vw';
+            main.style.animationDuration = (2.2 + Math.random() * 0.8) + 's';
+            layer.appendChild(main);
+            main.addEventListener('animationend', () => main.remove());
+
+            // Cinematic burst: a small confetti-like ring + emoji particles.
+            const ring = document.createElement('span');
+            ring.className = 'reaction-ring';
+            ring.style.left = centerX + 'vw';
+            ring.style.top = centerY + 'vh';
+            layer.appendChild(ring);
+            ring.addEventListener('animationend', () => ring.remove());
+            const burstCount = 8 + Math.floor(Math.random() * 5);
+            for (let i = 0; i < burstCount; i++) {
+                const p = document.createElement('span');
+                p.className = 'reaction-burst-particle';
+                p.textContent = emoji || '❤️';
+                const angle = (Math.PI * 2 * i / burstCount) + (Math.random() - .5) * .35;
+                const distance = 55 + Math.random() * 95;
+                p.style.left = centerX + 'vw';
+                p.style.top = centerY + 'vh';
+                p.style.setProperty('--dx', Math.cos(angle) * distance + 'px');
+                p.style.setProperty('--dy', Math.sin(angle) * distance + 'px');
+                p.style.setProperty('--rot', ((Math.random() * 90) - 45) + 'deg');
+                p.style.animationDelay = (Math.random() * .08) + 's';
+                layer.appendChild(p);
+                p.addEventListener('animationend', () => p.remove());
+            }
         }
 
         function broadcastToGuests(data, exceptPeerId) {
@@ -1588,19 +1997,44 @@
             if (data.type === 'chat') addChatMessage(data.name, data.text, data.system);
         }
 
+        function setPartyChatToggleLocation(inPlayer) {
+            if (!partyChatToggle) return;
+            const theatreSlot = document.getElementById('partyChatHeaderSlot');
+            if (inPlayer && playerChatToggleSlot) {
+                playerChatToggleSlot.appendChild(partyChatToggle);
+                partyChatToggle.classList.remove('theatre-chat-toggle');
+                partyChatToggle.classList.add('player-chat-toggle');
+            } else if (theatreSlot && partyCode && partyRoomScreen && !partyRoomScreen.classList.contains('hidden')) {
+                theatreSlot.appendChild(partyChatToggle);
+                partyChatToggle.classList.remove('player-chat-toggle');
+                partyChatToggle.classList.add('theatre-chat-toggle');
+                partyChatToggle.classList.remove('hidden');
+            } else {
+                document.body.appendChild(partyChatToggle);
+                partyChatToggle.classList.remove('player-chat-toggle');
+                partyChatToggle.classList.add('theatre-chat-toggle');
+                if (partyCode) partyChatToggle.classList.remove('hidden');
+            }
+        }
+
+        function closePartyMediaCalls() {
+            partyMediaCalls.forEach(call => { try { call.close(); } catch (e) {} });
+            partyMediaCalls.clear();
+        }
+
         function showPartyActivePanel() {
             showPartyPane('partyActive');
             document.getElementById('partyCodeDisplay').textContent = partyCode;
             document.getElementById('partyRoleNote').textContent = isPartyHost
-                ? 'You are hosting - play/pause/seek here syncs to everyone.'
-                : 'Connected as a guest. The host controls playback; you can still seek locally.';
+                ? 'You are the host — playback and queue approvals are yours.'
+                : 'You are a guest — request films, chat, react, and watch the host stream.';
             document.getElementById('leavePartyLabel').textContent = isPartyHost ? 'End Watch Party' : 'Leave Watch Party';
             updateMemberCount();
             partyStatusBadge.classList.remove('hidden');
             partyStatusBadge.classList.add('flex');
             document.getElementById('partyStatusText').textContent = isPartyHost ? `Hosting ${partyCode}` : `In party ${partyCode}`;
             partyChatToggle.classList.remove('hidden');
-            playerPartyChatBtn.classList.remove('hidden');
+            setPartyChatToggleLocation(false);
         }
 
         function updateMemberCount() {
@@ -1609,47 +2043,63 @@
             document.getElementById('partyChatCount').textContent = isPartyHost ? `(${count})` : '';
             const roomCount = document.getElementById('partyRoomMemberCount');
             if (roomCount) roomCount.textContent = count;
+            if (isPartyHost && partyCode) broadcastToGuests({type:'party-state', count});
         }
 
         // ---- Party Room: movie picker + permanently-docked chat ----
         const partyRoomScreen = document.getElementById('partyRoomScreen');
         const partyRoomChatSlot = document.getElementById('partyRoomChatSlot');
 
-        const CHAT_PANEL_FLOATING_CLASS = 'hidden fixed bottom-24 left-6 z-[70] w-80 max-w-[90vw] bg-netflixCard border border-zinc-700 rounded-lg shadow-2xl flex-col overflow-hidden';
-        const CHAT_PANEL_EMBEDDED_CLASS = 'flex flex-col w-full h-full bg-netflixCard border border-zinc-700 rounded-lg overflow-hidden';
+        const CHAT_PANEL_FLOATING_CLASS = 'hidden fixed top-[140px] right-5 z-[84] w-80 max-w-[calc(100vw-2rem)] bg-netflixCard border border-zinc-700 rounded-lg shadow-2xl flex-col overflow-hidden';
+        const CHAT_PANEL_EMBEDDED_CLASS = 'party-chat-inner flex flex-col w-full h-full bg-netflixCard border border-zinc-700 rounded-lg overflow-hidden';
 
         function setChatPanelMode(mode) {
             if (mode === 'embedded') {
+                partyRoomChatSlot.appendChild(partyChatPanel);
                 partyChatPanel.className = CHAT_PANEL_EMBEDDED_CLASS;
                 partyChatPanel.style.height = '';
-                partyChatToggle.classList.add('hidden');
-                playerPartyChatBtn.classList.add('hidden');
-                chatUnread = 0;
-                document.getElementById('partyChatBadge').classList.add('hidden');
+                partyChatToggle.classList.remove('hidden');
+                setPartyChatToggleLocation(false);
+            } else if (mode === 'player') {
+                document.getElementById('playerPartyChatSlot').appendChild(partyChatPanel);
+                partyChatPanel.className = CHAT_PANEL_EMBEDDED_CLASS;
+                partyChatPanel.style.height = '';
+                partyChatToggle.classList.remove('hidden');
+                setPartyChatToggleLocation(false);
             } else {
                 partyChatPanel.className = CHAT_PANEL_FLOATING_CLASS;
-                partyChatPanel.style.height = '420px';
+                partyChatPanel.style.height = 'min(520px,calc(100vh - 170px))';
                 document.body.appendChild(partyChatPanel);
                 if (partyCode) {
                     partyChatToggle.classList.remove('hidden');
-                    playerPartyChatBtn.classList.remove('hidden');
+                    setPartyChatToggleLocation(false);
                 }
             }
         }
 
         function enterPartyRoom() {
             if (!partyCode) return;
+            document.documentElement.classList.add('party-mode');
+            document.body.classList.add('party-mode');
             closePartyModal();
             document.getElementById('partyRoomCode').textContent = partyCode;
-            setChatPanelMode('embedded');
-            partyRoomChatSlot.appendChild(partyChatPanel);
+            if (window.matchMedia('(min-width: 1280px)').matches) setChatPanelMode('embedded');
+            else setChatPanelMode('floating');
             renderPartyMovieGrid();
+            renderPartyQueue();
+            addPartyAudit(isPartyHost ? 'You are hosting the theatre.' : 'You joined the theatre.');
+            document.getElementById('partyRolePill').textContent = isPartyHost ? 'Host' : 'Guest';
+            document.getElementById('partyRoomProfileName').textContent = partyName || partyProfileName || '';
             updateMemberCount();
             partyRoomScreen.classList.remove('hidden');
             partyRoomScreen.classList.add('flex');
+            setPartyChatToggleLocation(false);
         }
 
-        function leavePartyRoomToLibrary() {
+        function leavePartyRoomToLibrary() { requestLeaveTheatre(); }
+        function leavePartyRoomToLibraryNow() {
+            document.documentElement.classList.remove('party-mode');
+            document.body.classList.remove('party-mode');
             partyRoomScreen.classList.add('hidden');
             partyRoomScreen.classList.remove('flex');
             setChatPanelMode('floating');
@@ -1659,53 +2109,209 @@
             const grid = document.getElementById('partyMovieGrid');
             grid.innerHTML = '';
             if (movies.length === 0) {
-                grid.innerHTML = `
-                    <div class="col-span-full py-16 text-center text-zinc-500">
-                        <i class="fa-solid fa-folder-open text-5xl mb-3 text-zinc-700"></i>
-                        <p class="text-base mb-4">No movies loaded in this tab yet.</p>
-                        <button onclick="leavePartyRoomToLibrary(); folderInput.click();" class="bg-netflixRed hover:bg-red-700 px-4 py-2 rounded-md text-sm font-semibold transition">
-                            <i class="fa-solid fa-folder-open"></i> Load Movie Folder
-                        </button>
-                    </div>`;
+                grid.innerHTML = `<div class="col-span-full py-16 text-center text-zinc-500"><i class="fa-solid fa-folder-open text-5xl mb-3 text-zinc-700"></i><p class="text-base mb-4">No movies loaded in this tab yet.</p><button onclick="leavePartyRoomToLibraryNow(); folderInput.click();" class="bg-netflixRed hover:bg-red-700 px-4 py-2 rounded-md text-sm font-semibold transition"><i class="fa-solid fa-folder-open"></i> Load Movie Folder</button></div>`;
                 return;
             }
             movies.forEach((movie, index) => {
-                const card = document.createElement('div');
-                card.className = 'group relative bg-netflixCard rounded-lg overflow-hidden shadow-md hover:shadow-xl transition duration-200 transform hover:-translate-y-1 cursor-pointer';
-                card.onclick = () => selectPartyMovie(index);
-                const thumbStyle = movie.thumbnailUrl
-                    ? `background-image:url('${movie.thumbnailUrl}');background-size:cover;background-position:center;`
-                    : '';
+                const card = document.createElement('article');
+                card.className = 'party-movie-card group relative bg-[#171719] border border-zinc-800 rounded-2xl overflow-hidden shadow-md hover:border-zinc-600 transition duration-200 flex flex-col';
+                const thumbStyle = movie.thumbnailUrl ? `background-image:url('${movie.thumbnailUrl}');background-size:cover;background-position:center;` : '';
+                const inQueue = partyQueue.some(q => q.name === movie.name && q.requesterPeerId === (isPartyHost ? peer?.id : peer?.id));
                 card.innerHTML = `
-                    <div class="relative w-full h-28 md:h-36 bg-zinc-900 flex items-center justify-center overflow-hidden" style="${thumbStyle}">
-                        ${!movie.thumbnailUrl ? `<i class="fa-solid fa-clapperboard text-3xl text-zinc-700"></i>` : ''}
-                        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition bg-black/40">
-                            <div class="w-9 h-9 bg-netflixRed text-white rounded-full flex items-center justify-center"><i class="fa-solid fa-play ml-0.5 text-xs"></i></div>
-                        </div>
+                    <div class="party-movie-poster relative w-full bg-zinc-900 flex items-center justify-center overflow-hidden" style="${thumbStyle}">
+                        ${!movie.thumbnailUrl ? `<div class="text-center p-4"><i class="fa-solid fa-film text-4xl text-zinc-700"></i><p class="text-[10px] uppercase tracking-widest text-zinc-600 mt-2">${escapeHtml(movie.format)}</p></div>` : ''}
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent"></div>
+                        <div class="absolute top-2 right-2 bg-black/70 px-2 py-1 rounded-md text-[10px] font-mono text-zinc-300">${formatBytes(movie.size)}</div>
+                        ${movie.duration ? `<div class="absolute bottom-2 right-2 bg-black/70 px-2 py-1 rounded-md text-[10px] font-mono text-zinc-300">${formatDuration(movie.duration)}</div>` : ''}
                     </div>
-                    <div class="p-2.5">
-                        <p class="text-xs font-medium text-white line-clamp-2 leading-snug" title="${movie.cleanName}">${movie.cleanName}</p>
-                    </div>
-                `;
+                    <div class="p-3 flex-1 flex flex-col justify-between gap-3">
+                        <div><p class="text-sm font-semibold text-white line-clamp-2 leading-snug" title="${escapeHtml(movie.cleanName)}">${escapeHtml(movie.cleanName)}</p><p class="text-[10px] text-zinc-500 mt-1">${isPartyHost ? 'Add to the theatre queue' : 'Send a request to the host'}</p></div>
+                        <button type="button" aria-label="${isPartyHost ? 'Add to queue' : 'Request movie'}" class="party-add-queue bg-zinc-800 hover:bg-netflixRed border border-zinc-700 hover:border-netflixRed rounded-lg py-2 px-3 text-xs font-semibold transition flex items-center justify-center gap-2">
+                            <i class="fa-solid ${isPartyHost ? 'fa-plus' : 'fa-paper-plane'}"></i>${isPartyHost ? 'Add to Queue' : 'Request'}
+                        </button>
+                    </div>`;
+                card.querySelector('.party-add-queue').onclick = () => addMovieToPartyQueue(index);
                 grid.appendChild(card);
             });
         }
 
-        function selectPartyMovie(index) {
-            const movie = movies[index];
-            if (isPartyHost && movie) {
-                sendPartyData({
-                    type: 'movie-select',
-                    title: movie.cleanName,
-                    name: movie.name
-                });
-            }
-            partyRoomScreen.classList.add('hidden');
-            partyRoomScreen.classList.remove('flex');
-            setChatPanelMode('floating');
-            openPlayer(index);
-            if (isPartyHost) setTimeout(callAllGuestsWithVideo, 500);
+        function queueItemForMovie(movie, requester) {
+            return { id:`q-${Date.now()}-${Math.random().toString(36).slice(2,8)}`, title:movie.cleanName, name:movie.name, requester:requester || partyName || 'Host', requesterPeerId:peer?.id || '', status:'pending', createdAt:Date.now() };
         }
+
+        function addMovieToPartyQueue(index) {
+            const movie = movies[index];
+            if (!movie || !partyCode) return;
+            if (isPartyHost) {
+                if (partyQueue.some(q => q.name === movie.name && q.status !== 'rejected')) { addPartyAudit(`“${movie.cleanName}” is already in the queue.`, 'warn'); return; }
+                const item = queueItemForMovie(movie, partyName || 'Host');
+                item.status = 'approved';
+                partyQueue.push(item);
+                renderPartyQueue(); broadcastQueueState();
+                addPartyAudit(`Added “${movie.cleanName}” to the queue.`, 'good');
+            } else {
+                requestPartyMovie(index);
+            }
+        }
+
+        function renderPartyQueue() {
+            const list = document.getElementById('partyQueueList');
+            if (!list) return;
+            if (!partyQueue.length) { list.innerHTML = `<div class="h-full min-h-24 flex items-center justify-center text-center text-xs text-zinc-600 px-4">The queue is empty.<br>${isPartyHost?'Add films from your library.':'Request a film for the host.'}</div>`; return; }
+            list.innerHTML = partyQueue.map((q,i) => {
+                const status = q.status || 'pending';
+                const localIndex = isPartyHost ? movies.findIndex(m => m.name === q.name || m.cleanName === q.title) : -1;
+                const statusLabel = status === 'approved' ? 'Approved' : status === 'rejected' ? 'Rejected' : 'Pending';
+                const statusClass = status === 'approved' ? 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' : status === 'rejected' ? 'text-red-400 bg-red-400/10 border-red-400/20' : 'text-amber-300 bg-amber-300/10 border-amber-300/20';
+                return `<div class="party-queue-item rounded-xl border border-zinc-800 bg-zinc-900/70 p-3">
+                    <div class="flex items-start gap-2"><div class="w-8 h-8 shrink-0 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold">${escapeHtml((q.requester||'?').slice(0,1).toUpperCase())}</div><div class="min-w-0 flex-1"><p class="text-xs font-semibold text-white line-clamp-2">${escapeHtml(q.title)}</p><p class="text-[10px] text-zinc-500 mt-1">${escapeHtml(q.requester||'Guest')}</p></div><span class="text-[9px] px-1.5 py-1 rounded border ${statusClass}">${statusLabel}</span></div>
+                    ${isPartyHost ? `<div class="grid grid-cols-2 gap-2 mt-3">${status !== 'approved' ? `<button onclick="approvePartyQueue(${i})" class="bg-emerald-600/90 hover:bg-emerald-600 rounded-md py-1.5 text-[11px] font-semibold"><i class="fa-solid fa-check mr-1"></i> Accept</button>` : `<button onclick="playQueuedMovie(${i})" class="bg-netflixRed hover:bg-red-700 rounded-md py-1.5 text-[11px] font-semibold ${localIndex<0?'opacity-40 pointer-events-none':''}"><i class="fa-solid fa-play mr-1"></i> Play</button>`}<button onclick="rejectPartyQueue(${i})" class="bg-zinc-800 hover:bg-zinc-700 rounded-md py-1.5 text-[11px] font-semibold text-zinc-300"><i class="fa-solid fa-xmark mr-1"></i> ${status==='approved'?'Remove':'Reject'}</button></div>${localIndex<0 ? `<p class="mt-2 text-[10px] text-amber-300">Not found in host library.</p>` : ''}` : (q.requesterPeerId === peer?.id ? `<button onclick="removeOwnQueueRequest(${i})" class="mt-3 w-full bg-zinc-800 hover:bg-zinc-700 rounded-md py-1.5 text-[11px] font-semibold">Cancel request</button>` : `<div class="mt-3 text-[10px] text-zinc-500">${status === 'approved' ? 'Approved by host — up next.' : 'Waiting for host decision.'}</div>`)}
+                </div>`;
+            }).join('');
+        }
+
+        function broadcastQueueState() { if (isPartyHost) sendPartyData({type:'queue-state', queue:partyQueue}); }
+
+        function approvePartyQueue(index) {
+            if (!isPartyHost || !partyQueue[index]) return;
+            partyQueue[index].status = 'approved';
+            renderPartyQueue(); broadcastQueueState();
+            addPartyAudit(`Accepted “${partyQueue[index].title}”.`, 'good');
+            sendPartyData({type:'queue-update', action:'approved', request:partyQueue[index]});
+        }
+
+        function rejectPartyQueue(index) {
+            if (!isPartyHost || !partyQueue[index]) return;
+            const q = partyQueue[index];
+            partyQueue.splice(index,1);
+            renderPartyQueue(); broadcastQueueState();
+            addPartyAudit(`Removed “${q.title}” from the queue.`, 'warn');
+            sendPartyData({type:'queue-update', action:'rejected', request:q});
+        }
+
+        function removeOwnQueueRequest(index) {
+            if (isPartyHost || !partyQueue[index]) return;
+            const requestId = partyQueue[index].id;
+            partyQueue.splice(index,1);
+            renderPartyQueue();
+            sendPartyData({type:'queue-cancel', requestId});
+        }
+
+        function playQueuedMovie(index) {
+            if (!isPartyHost || !partyQueue[index]) return;
+            const q = partyQueue[index];
+            if (q.status !== 'approved') { addPartyAudit('Accept the queue item before playing it.', 'warn'); return; }
+            const localIndex = movies.findIndex(m => m.name === q.name || m.cleanName === q.title);
+            if (localIndex < 0) { addPartyAudit(`Could not find “${q.title}” in host library.`, 'warn'); return; }
+            partyQueue.splice(index,1);
+            renderPartyQueue(); broadcastQueueState();
+            startPartyMovie(localIndex, q);
+        }
+
+        function selectPartyMovie(index) { addMovieToPartyQueue(index); }
+
+        function requestPartyMovie(index) {
+            const movie = movies[index];
+            if (!movie || !hostConnection) return;
+            const req = queueItemForMovie(movie, partyName || 'Guest');
+            sendPartyData({type:'queue-request', request:req});
+            addPartyAudit(`Requested “${movie.cleanName}”.`, 'good');
+        }
+
+        function startPartyMovie(index, queueItem=null) {
+            const movie = movies[index];
+            if (!movie || !isPartyHost) return;
+            const title = movie.cleanName;
+            partyCurrentTitle = title;
+            partyHostPlaying = false;
+            partyRoomScreen.classList.add('hidden'); partyRoomScreen.classList.remove('flex');
+            setChatPanelMode('player');
+            openPlayer(index, {partyCountdown:true, deferAutoplay:true});
+            addPartyAudit(`Loading “${title}” for the screening.`, 'good');
+            waitForHostMovieReady(() => beginSynchronizedPartyCountdown(movie, queueItem));
+        }
+
+        function waitForHostMovieReady(done) {
+            let finished = false;
+            const finish = () => { if (finished) return; finished = true; cleanup(); done(); };
+            const cleanup = () => { videoPlayer.removeEventListener('canplay', finish); videoPlayer.removeEventListener('loadedmetadata', finish); videoPlayer.removeEventListener('error', fail); clearTimeout(timer); };
+            const fail = () => { if (finished) return; finished=true; cleanup(); addPartyAudit('The selected movie could not be loaded in the browser.', 'warn'); };
+            const timer=setTimeout(() => finish(), 15000);
+            videoPlayer.addEventListener('canplay', finish, {once:true});
+            videoPlayer.addEventListener('loadedmetadata', finish, {once:true});
+            videoPlayer.addEventListener('error', fail, {once:true});
+            if (videoPlayer.readyState >= 2) finish();
+        }
+
+        function beginSynchronizedPartyCountdown(movie, queueItem) {
+            const duration = 4000;
+            const endAt = Date.now() + duration;
+            partyHostPlaying = false;
+            showPartyCountdown(movie.cleanName, 4, () => {
+                if (playerModal.classList.contains('hidden')) return;
+                videoPlayer.play().then(() => {
+                    partyHostPlaying = true; updatePlayState(true);
+                    callAllGuestsWithVideo();
+                    sendPartyData({type:'party-start', title:movie.cleanName, name:movie.name, playAt:endAt});
+                    broadcastSync();
+                }).catch(() => addPartyAudit('Press Play to begin the screening.', 'warn'));
+            });
+            sendPartyData({type:'movie-select', title:movie.cleanName, name:movie.name, countdown:4, playAt:endAt});
+        }
+
+        function showPartyCountdown(title, seconds, done, endAt=null) {
+            clearInterval(partyCountdownTimer);
+            partyCountdownTimer = null;
+            partyCountdownActive = true;
+            const overlay=document.getElementById('partyCountdownOverlay');
+            const number=document.getElementById('partyCountdownNumber');
+            const titleEl=document.getElementById('partyCountdownTitle');
+            titleEl.textContent=title||'';
+            const durationMs = Math.max(1000, Number(seconds || 4) * 1000);
+            const deadline = Number(endAt) > Date.now() - 500 ? Number(endAt) : Date.now() + durationMs;
+            let completed = false;
+            const finish = () => {
+                if (completed) return; completed = true;
+                clearInterval(partyCountdownTimer); partyCountdownTimer=null;
+                overlay.classList.add('hidden'); overlay.classList.remove('flex');
+                number.classList.remove('party-countdown-pulse'); partyCountdownActive=false;
+                if (done) done();
+            };
+            const tick = () => {
+                const remainingMs = deadline - Date.now();
+                if (remainingMs <= 0) { finish(); return; }
+                number.textContent = Math.max(1, Math.ceil(remainingMs / 1000));
+            };
+            tick();
+            overlay.classList.remove('hidden'); overlay.classList.add('flex');
+            number.classList.add('party-countdown-pulse');
+            partyCountdownTimer=setInterval(tick,100);
+        }
+
+        function startGuestRemotePlayback() {
+            if (isPartyHost || !remotePartyPlayback || playerModal.classList.contains('hidden')) return;
+            const tryPlay = () => {
+                if (!videoPlayer.srcObject) return false;
+                videoPlayer.play().then(() => updatePlayState(true)).catch(() => {
+                    videoPlayer.muted = true;
+                    videoPlayer.play().then(() => { updatePlayState(true); addPartyAudit('Video started muted. Tap the volume control to enable sound.', 'warn'); }).catch(() => {});
+                });
+                return true;
+            };
+            if (!tryPlay()) setTimeout(tryPlay, 250);
+            setTimeout(tryPlay, 750);
+        }
+
+        function showGuestCountdown(title, seconds, playAt=null) {
+            partyCurrentTitle=title||partyCurrentTitle;
+            if(playerModal.classList.contains('hidden')){
+                partyRoomScreen.classList.add('hidden'); partyRoomScreen.classList.remove('flex'); setChatPanelMode('player'); openRemotePartyPlayer(title,pendingPartyStream);
+            }
+            showPartyCountdown(title, seconds, () => {
+                if (!isPartyHost) { partyHostPlaying = true; startGuestRemotePlayback(); }
+            }, playAt);
+        }
+
 
         function copyPartyLink() {
             const url = new URL(window.location.href);
@@ -1718,8 +2324,12 @@
             });
         }
 
-        function leaveParty() {
+        function leaveParty() { requestLeaveTheatre(); }
+
+        function leavePartyNow() {
+            if (!playerModal.classList.contains('hidden')) closePlayerNow();
             if (isPartyHost) {
+                broadcastToGuests({ type: 'party-ended', reason: 'The host ended the theatre.' });
                 broadcastToGuests({ type: 'chat', system: true, text: 'Host ended the watch party.' });
                 guestConnections.forEach(entry => { try { entry.conn.close(); } catch (e) {} });
             } else if (hostConnection) {
@@ -1738,13 +2348,19 @@
             partyCode = null;
             hostConnection = null;
             guestConnections.clear();
+            partyQueue = [];
+            partyAudit = [];
+            clearInterval(partyCountdownTimer);
+            partyCountdownTimer = null;
+            partyCountdownActive = false;
+            isPartyMovieSession = false;
             partyStatusBadge.classList.add('hidden');
             partyStatusBadge.classList.remove('flex');
             partyRoomScreen.classList.add('hidden');
             partyRoomScreen.classList.remove('flex');
             setChatPanelMode('floating');
             partyChatToggle.classList.add('hidden');
-            playerPartyChatBtn.classList.add('hidden');
+            setPartyChatToggleLocation(false);
             document.getElementById('partyChatMessages').innerHTML = '';
             closePartyModal();
             showPartyPane('partyIdle');
@@ -1754,14 +2370,30 @@
         function togglePartyChat() {
             const isHidden = partyChatPanel.classList.contains('hidden');
             if (isHidden) {
+                if (partyRoomScreen.classList.contains('flex') && !playerModal.classList.contains('flex')) {
+                    setChatPanelMode(window.matchMedia('(min-width: 1280px)').matches ? 'embedded' : 'floating');
+                } else if (playerModal.classList.contains('flex')) {
+                    setChatPanelMode('player');
+                    document.getElementById('playerPartyChatDock').classList.remove('hidden');
+                    document.getElementById('playerPartyChatDock').classList.add('flex');
+                    playerModal.classList.add('party-docked');
+                } else {
+                    setChatPanelMode('floating');
+                }
                 partyChatPanel.classList.remove('hidden');
                 partyChatPanel.classList.add('flex');
                 chatUnread = 0;
                 document.getElementById('partyChatBadge').classList.add('hidden');
-                document.getElementById('partyChatInput').focus();
+                requestAnimationFrame(() => document.getElementById('partyChatInput').focus());
             } else {
                 partyChatPanel.classList.add('hidden');
                 partyChatPanel.classList.remove('flex');
+                if (playerModal.classList.contains('flex')) {
+                    document.getElementById('playerPartyChatDock').classList.add('hidden');
+                    document.getElementById('playerPartyChatDock').classList.remove('flex');
+                    playerModal.classList.remove('party-docked');
+                }
+                partyChatToggle.classList.remove('hidden');
             }
         }
 
@@ -1807,7 +2439,8 @@
         // Playback sync - fires on real local interaction, guarded so an
         // incoming sync we apply doesn't get re-broadcast right back out.
         function broadcastSync() {
-            if (!partyCode || applyingRemoteSync) return;
+            if (!partyCode || applyingRemoteSync || !isPartyHost || !isPartyMovieSession) return;
+            partyHostPlaying = !videoPlayer.paused;
             sendPartyData({
                 type: 'sync',
                 time: videoPlayer.currentTime,
@@ -1817,21 +2450,21 @@
         }
 
         function applyRemoteSync(data) {
-            if (playerModal.classList.contains('hidden')) {
-                showNotification('Party: the host changed playback - open your copy of the movie to follow along.');
-                return;
-            }
+            if (playerModal.classList.contains('hidden')) return;
+            if (!isPartyHost && !remotePartyPlayback) return;
             applyingRemoteSync = true;
-            if (typeof data.time === 'number' && Math.abs(videoPlayer.currentTime - data.time) > 1.5) {
-                videoPlayer.currentTime = data.time;
+            if (!isPartyHost && remotePartyPlayback) {
+                partyHostPlaying = !!data.playing;
+                if (data.playing && videoPlayer.paused) videoPlayer.play().then(() => updatePlayState(true)).catch(() => {});
+                if (!data.playing && !videoPlayer.paused) { videoPlayer.pause(); updatePlayState(false); }
+            } else {
+                if (typeof data.time === 'number' && Math.abs(videoPlayer.currentTime - data.time) > 1.5) videoPlayer.currentTime = data.time;
+                if (data.playing && videoPlayer.paused) { videoPlayer.play(); updatePlayState(true); }
+                if (!data.playing && !videoPlayer.paused) { videoPlayer.pause(); updatePlayState(false); }
             }
-            if (data.playing && videoPlayer.paused) { videoPlayer.play(); updatePlayState(true); }
-            if (!data.playing && !videoPlayer.paused) { videoPlayer.pause(); updatePlayState(false); }
             setTimeout(() => { applyingRemoteSync = false; }, 300);
         }
 
-        playPauseBtn.addEventListener('click', () => setTimeout(broadcastSync, 0));
-        progressBar.addEventListener('change', broadcastSync);
 
         // Auto-prompt to join if this page was opened via a party link
         (function checkPartyLinkOnLoad() {
